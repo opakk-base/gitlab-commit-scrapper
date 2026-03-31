@@ -29,7 +29,10 @@ import {
   exportSummaryAsPDF,
   exportSummaryAsDOCX,
 } from "../services/export";
-import { addSummaryHistory, SummaryHistoryItem } from "../services/summaryHistory";
+import {
+  addSummaryHistory,
+  SummaryHistoryItem,
+} from "../services/summaryHistory";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -43,13 +46,28 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Pencil, Download, Trash2, Sparkles, RefreshCw, RotateCcw, Bot, FileText, ChevronDown, Check, Play } from "lucide-react";
+import {
+  Pencil,
+  Download,
+  Trash2,
+  Sparkles,
+  RefreshCw,
+  RotateCcw,
+  Bot,
+  FileText,
+  GitBranch,
+  ChevronDown,
+  Check,
+  Play,
+} from "lucide-react";
 
 export default function CommitSummary() {
   const navigate = useNavigate();
   const summaryRef = useRef<HTMLDivElement>(null);
   const [commits, setCommits] = useState<CommitWithProject[]>([]);
-  const [existingSummary, setExistingSummary] = useState<LLMSummary | null>(null);
+  const [existingSummary, setExistingSummary] = useState<LLMSummary | null>(
+    null,
+  );
   const [customPrompt, setCustomPrompt] = useState(getCustomPrompt());
   const [tempPrompt, setTempPrompt] = useState(getCustomPrompt());
   const [showPromptDialog, setShowPromptDialog] = useState(false);
@@ -66,7 +84,8 @@ export default function CommitSummary() {
   const [availableModels, setAvailableModels] = useState<string[]>([]);
 
   // Partial summary state for continue generation
-  const [partialSummary, setPartialSummary] = useState<ReturnType<typeof getPartialSummary>>(null);
+  const [partialSummary, setPartialSummary] =
+    useState<ReturnType<typeof getPartialSummary>>(null);
   const [continuing, setContinuing] = useState(false);
 
   useEffect(() => {
@@ -92,18 +111,25 @@ export default function CommitSummary() {
     const config = getLLMConfig();
 
     if (!config) {
-      setError("Please configure your LLM settings first. Go to LLM Settings to set up your API.");
+      setError(
+        "Please configure your LLM settings first. Go to LLM Settings to set up your API.",
+      );
       return;
     }
 
     // Check if Ollama (doesn't require API key)
-    const isOllama = config.provider === "ollama" || config.apiUrl.includes("ollama") || config.apiUrl.includes("localhost:11434");
+    const isOllama =
+      config.provider === "ollama" ||
+      config.apiUrl.includes("ollama") ||
+      config.apiUrl.includes("localhost:11434");
 
     // Determine which model to use
     const modelToUse = modelOverride || selectedModel || config.model;
 
     if ((!isOllama && !config.apiKey) || !modelToUse) {
-      setError("Please configure your LLM settings first. Go to LLM Settings to set up your API and select a model.");
+      setError(
+        "Please configure your LLM settings first. Go to LLM Settings to set up your API and select a model.",
+      );
       return;
     }
 
@@ -155,7 +181,7 @@ export default function CommitSummary() {
         configWithModel,
         commitsForSummary,
         customPrompt.systemPrompt,
-        customPrompt.userPromptTemplate
+        customPrompt.userPromptTemplate,
       );
       setRawResponse(response);
 
@@ -199,7 +225,9 @@ export default function CommitSummary() {
       if (partial) {
         setPartialSummary(partial);
       }
-      setError(err instanceof Error ? err.message : "Failed to generate summary");
+      setError(
+        err instanceof Error ? err.message : "Failed to generate summary",
+      );
     } finally {
       setLoading(false);
     }
@@ -234,13 +262,13 @@ export default function CommitSummary() {
             partialSummary.summary,
             partialSummary.systemPrompt,
             partialSummary.userPromptTemplate,
-            partialSummary.commits
+            partialSummary.commits,
           )
         : await generateCommitSummary(
             config,
             partialSummary.commits,
             partialSummary.systemPrompt,
-            partialSummary.userPromptTemplate
+            partialSummary.userPromptTemplate,
           );
 
       const summary: LLMSummary = {
@@ -278,7 +306,9 @@ export default function CommitSummary() {
         },
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to continue generation");
+      setError(
+        err instanceof Error ? err.message : "Failed to continue generation",
+      );
     } finally {
       setContinuing(false);
     }
@@ -345,7 +375,10 @@ export default function CommitSummary() {
     const filesChanged = new Set<string>();
 
     commits.forEach((c) => {
-      contributors.set(c.author_name, (contributors.get(c.author_name) || 0) + 1);
+      contributors.set(
+        c.author_name,
+        (contributors.get(c.author_name) || 0) + 1,
+      );
       projects.set(c.projectName, (projects.get(c.projectName) || 0) + 1);
       c.diffs?.forEach((d) => {
         filesChanged.add(d.new_path || d.old_path);
@@ -369,17 +402,20 @@ export default function CommitSummary() {
   if (commits.length === 0) {
     return (
       <div className="space-y-6">
-        <div className="bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-          <p className="text-yellow-700 dark:text-yellow-300">
-            No commits to summarize. Go to{" "}
-            <button
-              onClick={() => navigate("/commits")}
-              className="underline font-medium text-yellow-800 dark:text-yellow-200 hover:text-yellow-900 dark:hover:text-yellow-100"
-            >
-              Commit Scraper
-            </button>{" "}
-            to scrape commits first.
+        <div className="bg-card rounded-lg border border-border p-8 text-center">
+          <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Sparkles className="h-8 w-8 text-primary" />
+          </div>
+          <h3 className="text-lg font-medium text-foreground mb-2">
+            No Commits to Summarize
+          </h3>
+          <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+            Go to Commit Scraper to scrape commits from your GitLab projects first. Once you have commits, you can generate AI-powered summaries.
           </p>
+          <Button onClick={() => navigate("/commits")} size="lg">
+            <GitBranch className="h-5 w-5 mr-2" />
+            Go to Commit Scraper
+          </Button>
         </div>
       </div>
     );
@@ -395,15 +431,22 @@ export default function CommitSummary() {
               AI Commit Summary
             </h2>
             <p className="text-sm text-muted-foreground mt-1">
-              {commits.length} commits available • {stats.filesWithChanges} files changed • {stats.uniqueContributors} contributors
+              {commits.length} commits available • {stats.filesWithChanges}{" "}
+              files changed • {stats.uniqueContributors} contributors
             </p>
             {activeConfig && (
               <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                <span className="bg-muted px-1.5 py-0.5 rounded">{activeConfig.name}</span>
+                <span className="bg-muted px-1.5 py-0.5 rounded">
+                  {activeConfig.name}
+                </span>
                 <span>•</span>
-                <span className="bg-muted px-1.5 py-0.5 rounded font-mono">{selectedModel || activeConfig.model}</span>
+                <span className="bg-muted px-1.5 py-0.5 rounded font-mono">
+                  {selectedModel || activeConfig.model}
+                </span>
                 {availableModels.length > 1 && (
-                  <span className="text-primary">({availableModels.length} models available)</span>
+                  <span className="text-primary">
+                    ({availableModels.length} models available)
+                  </span>
                 )}
               </div>
             )}
@@ -421,36 +464,53 @@ export default function CommitSummary() {
                 <DialogHeader className="px-6 pt-6 pb-4 border-b border-border flex-shrink-0">
                   <DialogTitle>Custom Prompt</DialogTitle>
                   <DialogDescription>
-                    Customize how the AI generates summaries. Use placeholders to include dynamic content.
+                    Customize how the AI generates summaries. Use placeholders
+                    to include dynamic content.
                   </DialogDescription>
                 </DialogHeader>
 
-                <Tabs defaultValue="user" className="flex-1 flex flex-col overflow-hidden">
+                <Tabs
+                  defaultValue="user"
+                  className="flex-1 flex flex-col overflow-hidden"
+                >
                   <div className="px-6 pt-4">
                     <TabsList className="grid w-full grid-cols-2">
-                      <TabsTrigger value="user" className="flex items-center gap-2">
+                      <TabsTrigger
+                        value="user"
+                        className="flex items-center gap-2"
+                      >
                         <FileText className="h-4 w-4" />
                         User Prompt
                       </TabsTrigger>
-                      <TabsTrigger value="system" className="flex items-center gap-2">
+                      <TabsTrigger
+                        value="system"
+                        className="flex items-center gap-2"
+                      >
                         <Bot className="h-4 w-4" />
                         System Prompt
                       </TabsTrigger>
                     </TabsList>
                   </div>
 
-                  <TabsContent value="system" className="flex-1 overflow-y-auto px-6 py-4 mt-0">
+                  <TabsContent
+                    value="system"
+                    className="flex-1 overflow-y-auto px-6 py-4 mt-0"
+                  >
                     <div className="h-full flex flex-col">
                       <label className="block text-sm font-medium text-foreground mb-1">
                         System Prompt
                       </label>
                       <p className="text-xs text-muted-foreground mb-2">
-                        Defines the AI's role and behavior. This sets the context for how the AI should respond.
+                        Defines the AI's role and behavior. This sets the
+                        context for how the AI should respond.
                       </p>
                       <Textarea
                         value={tempPrompt.systemPrompt}
                         onChange={(e) =>
-                          setTempPrompt((prev) => ({ ...prev, systemPrompt: e.target.value }))
+                          setTempPrompt((prev) => ({
+                            ...prev,
+                            systemPrompt: e.target.value,
+                          }))
                         }
                         className="flex-1 min-h-[200px] font-mono text-sm"
                         placeholder="You are a helpful assistant that analyzes Git commits..."
@@ -458,20 +518,32 @@ export default function CommitSummary() {
                     </div>
                   </TabsContent>
 
-                  <TabsContent value="user" className="flex-1 overflow-y-auto px-6 py-4 mt-0">
+                  <TabsContent
+                    value="user"
+                    className="flex-1 overflow-y-auto px-6 py-4 mt-0"
+                  >
                     <div className="h-full flex flex-col">
                       <label className="block text-sm font-medium text-foreground mb-1">
                         User Prompt Template
                       </label>
                       <p className="text-xs text-muted-foreground mb-2">
-                        Use <code className="bg-muted px-1 rounded">{"{{commitCount}}"}</code> and{" "}
-                        <code className="bg-muted px-1 rounded">{"{{commits}}"}</code> as placeholders.
-                        The AI will respond in Markdown format.
+                        Use{" "}
+                        <code className="bg-muted px-1 rounded">
+                          {"{{commitCount}}"}
+                        </code>{" "}
+                        and{" "}
+                        <code className="bg-muted px-1 rounded">
+                          {"{{commits}}"}
+                        </code>{" "}
+                        as placeholders. The AI will respond in Markdown format.
                       </p>
                       <Textarea
                         value={tempPrompt.userPromptTemplate}
                         onChange={(e) =>
-                          setTempPrompt((prev) => ({ ...prev, userPromptTemplate: e.target.value }))
+                          setTempPrompt((prev) => ({
+                            ...prev,
+                            userPromptTemplate: e.target.value,
+                          }))
                         }
                         className="flex-1 min-h-[200px] font-mono text-sm"
                         placeholder="Analyze the following commits and provide a summary..."
@@ -485,9 +557,7 @@ export default function CommitSummary() {
                     <RotateCcw className="h-4 w-4 mr-2" />
                     Reset to Default
                   </Button>
-                  <Button onClick={handleSavePrompt}>
-                    Save Changes
-                  </Button>
+                  <Button onClick={handleSavePrompt}>Save Changes</Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
@@ -554,13 +624,17 @@ export default function CommitSummary() {
                   onClick={() => setShowModelMenu(!showModelMenu)}
                   disabled={loading}
                 >
-                  <span className="truncate max-w-[150px]">{selectedModel || "Select model"}</span>
+                  <span className="truncate max-w-[150px]">
+                    {selectedModel || "Select model"}
+                  </span>
                   <ChevronDown className="h-4 w-4 ml-2" />
                 </Button>
                 {showModelMenu && (
                   <div className="absolute right-0 mt-2 w-64 bg-card rounded-lg shadow-lg border border-border z-10">
                     <div className="p-2 border-b border-border">
-                      <p className="text-xs text-muted-foreground">Select model:</p>
+                      <p className="text-xs text-muted-foreground">
+                        Select model:
+                      </p>
                     </div>
                     <div className="py-1 max-h-48 overflow-y-auto">
                       {availableModels.map((model) => (
@@ -571,7 +645,9 @@ export default function CommitSummary() {
                             setShowModelMenu(false);
                           }}
                           className={`w-full text-left px-4 py-2 text-sm hover:bg-muted flex items-center justify-between ${
-                            model === selectedModel ? "bg-primary/10 text-primary" : "text-foreground"
+                            model === selectedModel
+                              ? "bg-primary/10 text-primary"
+                              : "text-foreground"
                           }`}
                         >
                           <span className="truncate">{model}</span>
@@ -586,10 +662,7 @@ export default function CommitSummary() {
               </div>
             )}
             {/* Generate/Regenerate button */}
-            <Button
-              onClick={() => handleGenerateSummary()}
-              disabled={loading}
-            >
+            <Button onClick={() => handleGenerateSummary()} disabled={loading}>
               {loading ? (
                 <>
                   <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
@@ -614,19 +687,27 @@ export default function CommitSummary() {
       {/* Quick Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-card rounded-lg border border-border p-4">
-          <p className="text-2xl font-bold text-primary">{stats.totalCommits}</p>
+          <p className="text-2xl font-bold text-primary">
+            {stats.totalCommits}
+          </p>
           <p className="text-sm text-muted-foreground">Total Commits</p>
         </div>
         <div className="bg-card rounded-lg border border-border p-4">
-          <p className="text-2xl font-bold text-green-600">{stats.uniqueContributors}</p>
+          <p className="text-2xl font-bold text-green-600">
+            {stats.uniqueContributors}
+          </p>
           <p className="text-sm text-muted-foreground">Contributors</p>
         </div>
         <div className="bg-card rounded-lg border border-border p-4">
-          <p className="text-2xl font-bold text-purple-600">{stats.uniqueProjects}</p>
+          <p className="text-2xl font-bold text-purple-600">
+            {stats.uniqueProjects}
+          </p>
           <p className="text-sm text-muted-foreground">Projects</p>
         </div>
         <div className="bg-card rounded-lg border border-border p-4">
-          <p className="text-2xl font-bold text-orange-600">{stats.filesWithChanges}</p>
+          <p className="text-2xl font-bold text-orange-600">
+            {stats.filesWithChanges}
+          </p>
           <p className="text-sm text-muted-foreground">Files Changed</p>
         </div>
       </div>
@@ -649,9 +730,7 @@ export default function CommitSummary() {
       )}
 
       {/* Loading State - Show Skeleton */}
-      {loading && (
-        <SummarySkeleton />
-      )}
+      {loading && <SummarySkeleton />}
 
       {/* Error */}
       {error && (
@@ -659,7 +738,9 @@ export default function CommitSummary() {
           <div className="flex items-start gap-3">
             <span className="text-xl">❌</span>
             <div>
-              <p className="font-medium text-destructive">Error generating summary</p>
+              <p className="font-medium text-destructive">
+                Error generating summary
+              </p>
               <p className="text-sm text-destructive/80 mt-1">{error}</p>
             </div>
           </div>
@@ -676,7 +757,9 @@ export default function CommitSummary() {
               </div>
               <div>
                 <p className="font-medium text-amber-800 dark:text-amber-200">
-                  {partialSummary.summary ? "Incomplete Summary Detected" : "Previous Generation Interrupted"}
+                  {partialSummary.summary
+                    ? "Incomplete Summary Detected"
+                    : "Previous Generation Interrupted"}
                 </p>
                 <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
                   {partialSummary.summary
@@ -684,7 +767,9 @@ export default function CommitSummary() {
                     : "The last generation attempt failed or was interrupted. You can retry the generation."}
                 </p>
                 <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
-                  Model: {partialSummary.modelUsed} • {partialSummary.totalCommits} commits • {new Date(partialSummary.generatedAt).toLocaleString()}
+                  Model: {partialSummary.modelUsed} •{" "}
+                  {partialSummary.totalCommits} commits •{" "}
+                  {new Date(partialSummary.generatedAt).toLocaleString()}
                 </p>
                 {/* Preview of partial summary (if exists) */}
                 {partialSummary.summary && (
@@ -702,7 +787,11 @@ export default function CommitSummary() {
               <Trash2 className="h-4 w-4 mr-2" />
               Discard
             </Button>
-            <Button size="sm" onClick={handleContinueGeneration} disabled={continuing}>
+            <Button
+              size="sm"
+              onClick={handleContinueGeneration}
+              disabled={continuing}
+            >
               {continuing ? (
                 <>
                   <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
@@ -732,10 +821,16 @@ export default function CommitSummary() {
       {existingSummary && !loading && (
         <>
           {/* Main Summary - Markdown Rendered */}
-          <div className="bg-card rounded-lg border border-border" ref={summaryRef} id="summary-content">
+          <div
+            className="bg-card rounded-lg border border-border"
+            ref={summaryRef}
+            id="summary-content"
+          >
             <div className="p-4 border-b border-border">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-foreground">Summary</h3>
+                <h3 className="text-lg font-semibold text-foreground">
+                  Summary
+                </h3>
                 <div className="text-sm text-muted-foreground">
                   Generated by {existingSummary.modelUsed} •{" "}
                   {new Date(existingSummary.generatedAt).toLocaleString()}
@@ -747,25 +842,39 @@ export default function CommitSummary() {
                 <ReactMarkdown
                   components={{
                     h1: ({ children }) => (
-                      <h1 className="text-2xl font-bold text-foreground mt-6 mb-4 first:mt-0">{children}</h1>
+                      <h1 className="text-2xl font-bold text-foreground mt-6 mb-4 first:mt-0">
+                        {children}
+                      </h1>
                     ),
                     h2: ({ children }) => (
-                      <h2 className="text-xl font-bold text-foreground mt-5 mb-3 first:mt-0">{children}</h2>
+                      <h2 className="text-xl font-bold text-foreground mt-5 mb-3 first:mt-0">
+                        {children}
+                      </h2>
                     ),
                     h3: ({ children }) => (
-                      <h3 className="text-lg font-semibold text-foreground mt-4 mb-2 first:mt-0">{children}</h3>
+                      <h3 className="text-lg font-semibold text-foreground mt-4 mb-2 first:mt-0">
+                        {children}
+                      </h3>
                     ),
                     h4: ({ children }) => (
-                      <h4 className="text-base font-semibold text-foreground mt-3 mb-2">{children}</h4>
+                      <h4 className="text-base font-semibold text-foreground mt-3 mb-2">
+                        {children}
+                      </h4>
                     ),
                     p: ({ children }) => (
-                      <p className="text-muted-foreground leading-relaxed mb-3">{children}</p>
+                      <p className="text-muted-foreground leading-relaxed mb-3">
+                        {children}
+                      </p>
                     ),
                     ul: ({ children }) => (
-                      <ul className="list-disc list-inside text-muted-foreground space-y-1 mb-3 ml-2">{children}</ul>
+                      <ul className="list-disc list-inside text-muted-foreground space-y-1 mb-3 ml-2">
+                        {children}
+                      </ul>
                     ),
                     ol: ({ children }) => (
-                      <ol className="list-decimal list-inside text-muted-foreground space-y-1 mb-3 ml-2">{children}</ol>
+                      <ol className="list-decimal list-inside text-muted-foreground space-y-1 mb-3 ml-2">
+                        {children}
+                      </ol>
                     ),
                     li: ({ children }) => (
                       <li className="text-muted-foreground">{children}</li>
@@ -786,7 +895,9 @@ export default function CommitSummary() {
                       );
                     },
                     pre: ({ children }) => (
-                      <pre className="bg-muted rounded-lg p-3 overflow-x-auto mb-3">{children}</pre>
+                      <pre className="bg-muted rounded-lg p-3 overflow-x-auto mb-3">
+                        {children}
+                      </pre>
                     ),
                     blockquote: ({ children }) => (
                       <blockquote className="border-l-4 border-primary/50 pl-4 italic text-muted-foreground my-3">
@@ -794,30 +905,45 @@ export default function CommitSummary() {
                       </blockquote>
                     ),
                     strong: ({ children }) => (
-                      <strong className="font-semibold text-foreground">{children}</strong>
+                      <strong className="font-semibold text-foreground">
+                        {children}
+                      </strong>
                     ),
                     em: ({ children }) => (
-                      <em className="italic text-muted-foreground">{children}</em>
+                      <em className="italic text-muted-foreground">
+                        {children}
+                      </em>
                     ),
                     a: ({ href, children }) => (
-                      <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                      <a
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline"
+                      >
                         {children}
                       </a>
                     ),
                     hr: () => <hr className="border-border my-4" />,
                     table: ({ children }) => (
                       <div className="overflow-x-auto mb-3">
-                        <table className="min-w-full border-collapse border border-border">{children}</table>
+                        <table className="min-w-full border-collapse border border-border">
+                          {children}
+                        </table>
                       </div>
                     ),
                     thead: ({ children }) => (
                       <thead className="bg-muted">{children}</thead>
                     ),
                     th: ({ children }) => (
-                      <th className="border border-border px-3 py-2 text-left font-semibold text-foreground">{children}</th>
+                      <th className="border border-border px-3 py-2 text-left font-semibold text-foreground">
+                        {children}
+                      </th>
                     ),
                     td: ({ children }) => (
-                      <td className="border border-border px-3 py-2 text-muted-foreground">{children}</td>
+                      <td className="border border-border px-3 py-2 text-muted-foreground">
+                        {children}
+                      </td>
                     ),
                   }}
                 >
@@ -832,10 +958,17 @@ export default function CommitSummary() {
             <h4 className="font-medium text-foreground mb-2">Analysis Info</h4>
             <ul className="text-sm text-muted-foreground space-y-1">
               <li>
-                • <strong className="text-foreground">{existingSummary.totalCommits}</strong> commits analyzed
+                •{" "}
+                <strong className="text-foreground">
+                  {existingSummary.totalCommits}
+                </strong>{" "}
+                commits analyzed
               </li>
               <li>
-                • Model used: <strong className="text-foreground">{existingSummary.modelUsed}</strong>
+                • Model used:{" "}
+                <strong className="text-foreground">
+                  {existingSummary.modelUsed}
+                </strong>
               </li>
               <li>
                 • Generated at:{" "}
@@ -858,8 +991,8 @@ export default function CommitSummary() {
             Ready to Generate Summary
           </h3>
           <p className="text-muted-foreground mb-4">
-            Click "Generate Summary" to analyze your {commits.length} commits with{" "}
-            {stats.filesWithChanges} file changes using AI.
+            Click "Generate Summary" to analyze your {commits.length} commits
+            with {stats.filesWithChanges} file changes using AI.
           </p>
           <div className="flex justify-center gap-3">
             <Button variant="outline" onClick={handleOpenPromptDialog}>
@@ -877,7 +1010,9 @@ export default function CommitSummary() {
       {/* Debug: Raw Response */}
       {isDebugMode() && rawResponse && (
         <div className="bg-muted rounded-lg p-4">
-          <h3 className="font-medium text-foreground mb-2">Raw API Response (Debug)</h3>
+          <h3 className="font-medium text-foreground mb-2">
+            Raw API Response (Debug)
+          </h3>
           <pre className="text-xs text-muted-foreground overflow-auto whitespace-pre-wrap max-h-96">
             {rawResponse}
           </pre>
@@ -900,7 +1035,7 @@ export default function CommitSummary() {
                 },
               },
               null,
-              2
+              2,
             )}
           </pre>
         </div>

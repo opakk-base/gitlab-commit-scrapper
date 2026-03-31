@@ -345,98 +345,136 @@ export default function Dashboard() {
 
       {/* View Summary Dialog */}
       <Dialog open={showViewDialog} onOpenChange={setShowViewDialog}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Summary Details</DialogTitle>
-            <DialogDescription>
-              Generated on {selectedItem && formatDate(selectedItem.generatedAt)}
-            </DialogDescription>
+        <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col p-0 gap-0 overflow-hidden">
+          {/* Header */}
+          <DialogHeader className="px-6 pt-6 pb-4 border-b border-border flex-shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                <FileText className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <DialogTitle className="text-lg font-semibold">Summary Details</DialogTitle>
+                <DialogDescription className="text-sm text-muted-foreground">
+                  Generated on {selectedItem && formatDate(selectedItem.generatedAt)}
+                </DialogDescription>
+              </div>
+            </div>
           </DialogHeader>
 
-          {selectedItem && (
-            <div className="space-y-4">
-              {/* Meta info */}
-              <div className="grid grid-cols-2 gap-4 p-4 bg-muted rounded-lg">
-                <div>
-                  <p className="text-sm text-muted-foreground">Model</p>
-                  <p className="font-medium text-foreground">{selectedItem.modelUsed}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Configuration</p>
-                  <p className="font-medium text-foreground">{selectedItem.configName}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Commits</p>
-                  <p className="font-medium text-foreground">{selectedItem.totalCommits}</p>
-                </div>
-                {selectedItem.projectStats && (
-                  <div>
-                    <p className="text-sm text-muted-foreground">Contributors</p>
-                    <p className="font-medium text-foreground">{selectedItem.projectStats.uniqueContributors}</p>
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+            {selectedItem && (
+              <>
+                {/* Meta info */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-muted/50 rounded-lg p-3">
+                    <p className="text-xs text-muted-foreground mb-1">Model</p>
+                    <p className="font-medium text-foreground text-sm truncate">{selectedItem.modelUsed}</p>
                   </div>
-                )}
-              </div>
-
-              {/* Summary content */}
-              <div className="bg-card rounded-lg border border-border">
-                <div className="p-4 border-b border-border">
-                  <h4 className="font-medium text-foreground">Summary</h4>
+                  <div className="bg-muted/50 rounded-lg p-3">
+                    <p className="text-xs text-muted-foreground mb-1">Configuration</p>
+                    <p className="font-medium text-foreground text-sm truncate">{selectedItem.configName}</p>
+                  </div>
+                  <div className="bg-muted/50 rounded-lg p-3">
+                    <p className="text-xs text-muted-foreground mb-1">Commits</p>
+                    <p className="font-medium text-foreground text-sm">{selectedItem.totalCommits}</p>
+                  </div>
+                  {selectedItem.projectStats && (
+                    <div className="bg-muted/50 rounded-lg p-3">
+                      <p className="text-xs text-muted-foreground mb-1">Contributors</p>
+                      <p className="font-medium text-foreground text-sm">{selectedItem.projectStats.uniqueContributors}</p>
+                    </div>
+                  )}
                 </div>
-                <div className="p-4">
-                  <div className="prose prose-sm max-w-none dark:prose-invert">
-                    <ReactMarkdown
-                      components={{
-                        h1: ({ children }) => (
-                          <h1 className="text-2xl font-bold text-foreground mt-6 mb-4 first:mt-0">{children}</h1>
-                        ),
-                        h2: ({ children }) => (
-                          <h2 className="text-xl font-bold text-foreground mt-5 mb-3 first:mt-0">{children}</h2>
-                        ),
-                        h3: ({ children }) => (
-                          <h3 className="text-lg font-semibold text-foreground mt-4 mb-2 first:mt-0">{children}</h3>
-                        ),
-                        p: ({ children }) => (
-                          <p className="text-muted-foreground leading-relaxed mb-3">{children}</p>
-                        ),
-                        ul: ({ children }) => (
-                          <ul className="list-disc list-inside text-muted-foreground space-y-1 mb-3 ml-2">{children}</ul>
-                        ),
-                        li: ({ children }) => (
-                          <li className="text-muted-foreground">{children}</li>
-                        ),
-                        code: ({ className, children }) => {
-                          const isInline = !className;
-                          if (isInline) {
+
+                {/* Summary content */}
+                <div className="bg-card rounded-lg border border-border">
+                  <div className="p-4 border-b border-border">
+                    <h4 className="font-medium text-foreground">Summary</h4>
+                  </div>
+                  <div className="p-4">
+                    <div className="prose prose-sm max-w-none dark:prose-invert">
+                      <ReactMarkdown
+                        components={{
+                          h1: ({ children }) => (
+                            <h1 className="text-2xl font-bold text-foreground mt-6 mb-4 first:mt-0">{children}</h1>
+                          ),
+                          h2: ({ children }) => (
+                            <h2 className="text-xl font-bold text-foreground mt-5 mb-3 first:mt-0">{children}</h2>
+                          ),
+                          h3: ({ children }) => (
+                            <h3 className="text-lg font-semibold text-foreground mt-4 mb-2 first:mt-0">{children}</h3>
+                          ),
+                          p: ({ children }) => (
+                            <p className="text-muted-foreground leading-relaxed mb-3">{children}</p>
+                          ),
+                          ul: ({ children }) => (
+                            <ul className="list-disc list-inside text-muted-foreground space-y-1 mb-3 ml-2">{children}</ul>
+                          ),
+                          li: ({ children }) => (
+                            <li className="text-muted-foreground">{children}</li>
+                          ),
+                          code: ({ className, children }) => {
+                            const isInline = !className;
+                            if (isInline) {
+                              return (
+                                <code className="bg-muted text-foreground px-1.5 py-0.5 rounded text-sm font-mono">
+                                  {children}
+                                </code>
+                              );
+                            }
                             return (
-                              <code className="bg-muted text-foreground px-1.5 py-0.5 rounded text-sm font-mono">
+                              <code className="block bg-muted text-foreground p-3 rounded text-sm font-mono overflow-x-auto">
                                 {children}
                               </code>
                             );
-                          }
-                          return (
-                            <code className="block bg-muted text-foreground p-3 rounded text-sm font-mono overflow-x-auto">
-                              {children}
-                            </code>
-                          );
-                        },
-                        strong: ({ children }) => (
-                          <strong className="font-semibold text-foreground">{children}</strong>
-                        ),
-                      }}
-                    >
-                      {selectedItem.summary}
-                    </ReactMarkdown>
+                          },
+                          strong: ({ children }) => (
+                            <strong className="font-semibold text-foreground">{children}</strong>
+                          ),
+                        }}
+                      >
+                        {selectedItem.summary}
+                      </ReactMarkdown>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
-          )}
+              </>
+            )}
+          </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowViewDialog(false)}>
+          {/* Footer */}
+          <div className="px-6 py-4 border-t border-border bg-muted/30 flex items-center justify-between flex-shrink-0">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => selectedItem && handleExport(selectedItem, "txt")}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Text
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => selectedItem && handleExport(selectedItem, "pdf")}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                PDF
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => selectedItem && handleExport(selectedItem, "docx")}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Word
+              </Button>
+            </div>
+            <Button variant="secondary" onClick={() => setShowViewDialog(false)}>
               Close
             </Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 

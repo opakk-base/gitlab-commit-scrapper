@@ -1,23 +1,17 @@
 import { cn } from "@/lib/utils";
+import { useState, useEffect } from "react";
 
 interface SummarySkeletonProps {
   className?: string;
 }
 
 export function Skeleton({ className }: { className?: string }) {
-  return (
-    <div
-      className={cn(
-        "animate-pulse rounded-md bg-muted",
-        className
-      )}
-    />
-  );
+  return <div className={cn("animate-pulse rounded-md bg-muted", className)} />;
 }
 
 export function SummarySkeleton({ className }: SummarySkeletonProps) {
   return (
-    <div className={cn("space-y-6", className)}>
+    <div className={cn("relative space-y-6", className)}>
       {/* Summary Card */}
       <div className="bg-card rounded-lg border border-border">
         {/* Header */}
@@ -52,7 +46,10 @@ export function SummarySkeleton({ className }: SummarySkeletonProps) {
             {[0, 1, 2, 3].map((i) => (
               <div key={i} className="flex items-start gap-2">
                 <Skeleton className="h-2 w-2 rounded-full mt-2" />
-                <TypingSkeletonLine width={i === 3 ? "w-3/5" : "w-4/5"} delay={i * 0.3} />
+                <TypingSkeletonLine
+                  width={i === 3 ? "w-3/5" : "w-4/5"}
+                  delay={i * 0.3}
+                />
               </div>
             ))}
           </div>
@@ -85,17 +82,29 @@ export function SummarySkeleton({ className }: SummarySkeletonProps) {
         </div>
       </div>
 
-      {/* AI Generating indicator */}
-      <div className="flex items-center justify-center gap-2 text-muted-foreground">
-        <AIGeneratingDots />
-        <span className="text-sm">AI is generating your summary...</span>
+      {/* Overlay with rotating tip */}
+      <div className="absolute inset-0 bg-background/60 backdrop-blur-[1px] rounded-lg flex items-center justify-center z-10">
+        <div className="bg-card border border-border rounded-xl shadow-sm p-6 w-100">
+          <div className="flex flex-col items-center justify-center gap-4">
+            <AIGeneratingDots />
+            <span className="text-sm font-medium text-foreground">
+              AI is generating your summary...
+            </span>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
 // Typing skeleton line with animation delay
-function TypingSkeletonLine({ width, delay }: { width: string; delay: number }) {
+function TypingSkeletonLine({
+  width,
+  delay,
+}: {
+  width: string;
+  delay: number;
+}) {
   return (
     <div
       className="relative overflow-hidden"
@@ -114,11 +123,37 @@ function TypingSkeletonLine({ width, delay }: { width: string; delay: number }) 
 // AI generating dots animation
 function AIGeneratingDots() {
   return (
-    <div className="flex items-center gap-1">
-      <span className="text-primary">●</span>
-      <span className="text-primary/60 animate-pulse delay-0">●</span>
-      <span className="text-primary/40 animate-pulse delay-150">●</span>
+    <div className="flex items-center gap-1.5">
+      <span className="w-2.5 h-2.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: "0ms", animationDuration: "800ms" }} />
+      <span className="w-2.5 h-2.5 rounded-full bg-primary/70 animate-bounce" style={{ animationDelay: "150ms", animationDuration: "800ms" }} />
+      <span className="w-2.5 h-2.5 rounded-full bg-primary/40 animate-bounce" style={{ animationDelay: "300ms", animationDuration: "800ms" }} />
     </div>
+  );
+}
+
+// Rotating tips while waiting
+const tips = [
+  "💡 Tip: You can customize the prompt to focus on specific areas",
+  "📊 Analyzing commit patterns and contributor activity...",
+  "🔍 Extracting key changes from commit messages...",
+  "✨ Preparing insights and recommendations...",
+  "📝 Organizing summary by topics and projects...",
+];
+
+function RotatingTip() {
+  const [tipIndex, setTipIndex] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTipIndex((prev) => (prev + 1) % tips.length);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <span className="text-xs text-muted-foreground/80 transition-opacity duration-500">
+      {tips[tipIndex]}
+    </span>
   );
 }
 
