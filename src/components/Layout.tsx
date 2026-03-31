@@ -1,5 +1,20 @@
-import { ReactNode, useState } from "react";
+import { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { useState, createContext, useContext, useCallback } from "react";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
+import {
+  Home,
+  ClipboardList,
+  Bot,
+  Link2,
+  Key,
+  Settings,
+  ChevronRight,
+  PanelLeftClose,
+  PanelLeft,
+} from "lucide-react";
 
 interface LayoutProps {
   children: ReactNode;
@@ -8,48 +23,61 @@ interface LayoutProps {
 interface NavItem {
   path: string;
   label: string;
-  icon: string;
+  icon: ReactNode;
 }
 
 interface NavSection {
   label: string;
-  icon: string;
+  icon: ReactNode;
   items: NavItem[];
 }
+
+// Sidebar context for state management
+type SidebarContextType = {
+  isOpen: boolean;
+  toggle: () => void;
+};
+
+const SidebarContext = createContext<SidebarContextType>({
+  isOpen: true,
+  toggle: () => {},
+});
+
+export const useSidebarState = () => useContext(SidebarContext);
 
 const navSections: NavSection[] = [
   {
     label: "General",
-    icon: "🏠",
-    items: [{ path: "/", label: "Dashboard", icon: "📊" }],
+    icon: <Home className="h-4 w-4" />,
+    items: [
+      { path: "/", label: "Dashboard", icon: <Home className="h-4 w-4" /> },
+    ],
   },
   {
     label: "GitLab",
-    icon: "🦊",
+    icon: <Link2 className="h-4 w-4" />,
     items: [
-      { path: "/commits", label: "Commit Scraper", icon: "🔍" },
-      { path: "/commits/results", label: "Scrape Results", icon: "📋" },
-      { path: "/commits/summary", label: "AI Summary", icon: "🤖" },
-      { path: "/gitlab-settings", label: "GitLab Settings", icon: "🔗" },
+      { path: "/commits", label: "Commits", icon: <ClipboardList className="h-4 w-4" /> },
+      { path: "/commits/summary", label: "AI Summary", icon: <Bot className="h-4 w-4" /> },
+      { path: "/gitlab-settings", label: "GitLab Settings", icon: <Link2 className="h-4 w-4" /> },
     ],
   },
   {
     label: "AI / LLM",
-    icon: "🧠",
+    icon: <Bot className="h-4 w-4" />,
     items: [
-      { path: "/llm-settings", label: "LLM Settings", icon: "🔑" },
+      { path: "/llm-settings", label: "LLM Settings", icon: <Key className="h-4 w-4" /> },
     ],
   },
 ];
 
 const standaloneItems: NavItem[] = [
-  { path: "/settings", label: "Settings", icon: "⚙️" },
+  { path: "/settings", label: "Settings", icon: <Settings className="h-4 w-4" /> },
 ];
 
 const pageTitles: Record<string, string> = {
   "/": "Dashboard",
-  "/commits": "Commit Scraper",
-  "/commits/results": "Scrape Results",
+  "/commits": "Commits",
   "/commits/summary": "AI Summary",
   "/gitlab-settings": "GitLab Settings",
   "/llm-settings": "LLM Settings",
@@ -58,122 +86,182 @@ const pageTitles: Record<string, string> = {
 
 export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    new Set(["GitLab", "AI / LLM"])
-  );
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  const toggleSection = (sectionLabel: string) => {
-    setExpandedSections((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(sectionLabel)) {
-        newSet.delete(sectionLabel);
-      } else {
-        newSet.add(sectionLabel);
-      }
-      return newSet;
-    });
-  };
-
-  const isSectionActive = (section: NavSection) =>
-    section.items.some((item) => item.path === location.pathname);
+  const toggleSidebar = useCallback(() => {
+    setSidebarOpen((prev) => !prev);
+  }, []);
 
   const getCurrentPageTitle = () => {
     return pageTitles[location.pathname] || "Dashboard";
   };
 
   return (
-    <div className="flex h-screen bg-gray-100">
-      {/* Sidebar */}
-      <aside className="w-64 bg-slate-800 text-white flex flex-col">
-        <div className="p-4 border-b border-slate-700">
-          <h1 className="text-xl font-bold">GitLab Scraper</h1>
-        </div>
-        <nav className="flex-1 p-4">
-          {/* Sections with expandable sub-items */}
-          {navSections.map((section) => (
-            <div key={section.label} className="mb-2">
-              <button
-                onClick={() => toggleSection(section.label)}
-                className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-colors w-full ${
-                  isSectionActive(section)
-                    ? "bg-slate-700"
-                    : "hover:bg-slate-700"
-                }`}
-              >
-                <span>{section.icon}</span>
-                <span className="flex-1 text-left">{section.label}</span>
-                <span
-                  className={`transition-transform ${
-                    expandedSections.has(section.label) ? "rotate-90" : ""
-                  }`}
-                >
-                  ▶
-                </span>
-              </button>
-              {expandedSections.has(section.label) && (
-                <ul className="mt-1 ml-4 space-y-1">
+    <SidebarContext.Provider value={{ isOpen: sidebarOpen, toggle: toggleSidebar }}>
+      <div className="flex h-screen bg-background">
+        {/* Sidebar - uses flex, not fixed */}
+        <aside
+          className={cn(
+            "flex flex-col bg-sidebar text-sidebar-foreground transition-all duration-300 ease-in-out border-r border-sidebar-border",
+            sidebarOpen ? "w-64" : "w-16"
+          )}
+        >
+          {/* Header */}
+          <div className="p-2 border-b border-sidebar-border">
+            <Link
+              to="/"
+              className={cn(
+                "flex items-center gap-3 rounded-lg p-2 hover:bg-sidebar-accent transition-colors",
+                sidebarOpen ? "px-3" : "justify-center"
+              )}
+            >
+              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                <Link2 className="h-4 w-4" />
+              </div>
+              {sidebarOpen && (
+                <div className="flex flex-col gap-0.5 leading-none">
+                  <span className="font-semibold">GitLab Scraper</span>
+                  <span className="text-xs text-sidebar-foreground/70">v1.0.0</span>
+                </div>
+              )}
+            </Link>
+          </div>
+
+          {/* Navigation */}
+          <nav className="flex-1 overflow-y-auto p-2">
+            {navSections.map((section) => (
+              <div key={section.label} className="mb-2">
+                {sidebarOpen && (
+                  <div className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-sidebar-foreground/70">
+                    {section.icon}
+                    {section.label}
+                  </div>
+                )}
+                <ul className="space-y-1">
                   {section.items.map((item) => (
                     <li key={item.path}>
                       <Link
                         to={item.path}
-                        className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${
+                        className={cn(
+                          "flex items-center gap-3 rounded-lg p-2 transition-colors",
                           location.pathname === item.path
-                            ? "bg-blue-600 text-white"
-                            : "hover:bg-slate-700"
-                        }`}
+                            ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                            : "hover:bg-sidebar-accent/50",
+                          sidebarOpen ? "px-3" : "justify-center"
+                        )}
+                        title={!sidebarOpen ? item.label : undefined}
                       >
-                        <span className="text-sm">{item.icon}</span>
-                        <span className="text-sm">{item.label}</span>
+                        {item.icon}
+                        {sidebarOpen && <span className="text-sm">{item.label}</span>}
+                        {sidebarOpen && location.pathname === item.path && (
+                          <ChevronRight className="ml-auto h-4 w-4" />
+                        )}
                       </Link>
                     </li>
                   ))}
                 </ul>
+              </div>
+            ))}
+
+            <Separator className="my-3 bg-sidebar-border" />
+
+            {/* Standalone items */}
+            <ul className="space-y-1">
+              {standaloneItems.map((item) => (
+                <li key={item.path}>
+                  <Link
+                    to={item.path}
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg p-2 transition-colors",
+                      location.pathname === item.path
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                        : "hover:bg-sidebar-accent/50",
+                      sidebarOpen ? "px-3" : "justify-center"
+                    )}
+                    title={!sidebarOpen ? item.label : undefined}
+                  >
+                    {item.icon}
+                    {sidebarOpen && <span className="text-sm">{item.label}</span>}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+
+          {/* Footer */}
+          <div className="p-2 border-t border-sidebar-border">
+            <div
+              className={cn(
+                "flex items-center gap-3 rounded-lg p-2 bg-sidebar-accent/50",
+                sidebarOpen ? "px-3" : "justify-center"
+              )}
+            >
+              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-accent text-sidebar-accent-foreground">
+                <Settings className="h-4 w-4" />
+              </div>
+              {sidebarOpen && (
+                <div className="flex flex-col gap-0.5 leading-none">
+                  <span className="font-medium text-sm">User</span>
+                  <span className="text-xs text-sidebar-foreground/70">Active</span>
+                </div>
               )}
             </div>
-          ))}
-
-          {/* Standalone items */}
-          <ul className="space-y-2 mt-4">
-            {standaloneItems.map((item) => (
-              <li key={item.path}>
-                <Link
-                  to={item.path}
-                  className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${
-                    location.pathname === item.path
-                      ? "bg-blue-600 text-white"
-                      : "hover:bg-slate-700"
-                  }`}
-                >
-                  <span>{item.icon}</span>
-                  <span>{item.label}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
-        <div className="p-4 border-t border-slate-700 text-sm text-slate-400">
-          v1.0.0
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Navbar */}
-        <header className="bg-white shadow-sm px-6 py-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-800">
-            {getCurrentPageTitle()}
-          </h2>
-          <div className="flex items-center gap-4">
-            <span className="text-gray-600">Welcome, User</span>
-            <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm">
-              U
-            </div>
           </div>
-        </header>
+        </aside>
 
-        {/* Content Area */}
-        <main className="flex-1 overflow-auto p-6">{children}</main>
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Navbar */}
+          <header className="flex h-16 shrink-0 items-center gap-2 border-b border-border bg-card px-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 hover:bg-accent hover:text-accent-foreground"
+              onClick={toggleSidebar}
+            >
+              {sidebarOpen ? (
+                <PanelLeftClose className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <PanelLeft className="h-4 w-4 text-muted-foreground" />
+              )}
+              <span className="sr-only">Toggle Sidebar</span>
+            </Button>
+
+            <Separator orientation="vertical" className="h-6 bg-border" />
+
+            {/* Breadcrumb */}
+            <nav className="flex items-center gap-2 flex-1">
+              <Link
+                to="/"
+                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Home
+              </Link>
+              {location.pathname !== "/" && (
+                <>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium text-foreground">
+                    {getCurrentPageTitle()}
+                  </span>
+                </>
+              )}
+            </nav>
+
+            {/* User info */}
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-muted-foreground hidden sm:block">
+                Welcome, User
+              </span>
+              <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground">
+                <span className="text-xs font-medium">U</span>
+              </div>
+            </div>
+          </header>
+
+          {/* Content */}
+          <main className="flex-1 overflow-auto p-6 bg-background">{children}</main>
+        </div>
       </div>
-    </div>
+    </SidebarContext.Provider>
   );
 }

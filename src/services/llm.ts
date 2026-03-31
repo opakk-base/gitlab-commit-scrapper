@@ -1,10 +1,21 @@
 const LLM_CONFIG_KEY = "llm_config";
+const LLM_CONFIGS_KEY = "llm_configs";
+const LLM_ACTIVE_CONFIG_KEY = "llm_active_config";
 const LLM_SUMMARY_KEY = "llm_summary";
+const LLM_PARTIAL_SUMMARY_KEY = "llm_partial_summary";
+
+export type LLMProviderCode = "openai" | "azure" | "ollama" | "groq" | "together" | "openrouter" | "custom";
 
 export interface LLMConfig {
+  id: string;
+  name: string;
+  provider: LLMProviderCode; // Provider code, not URL-based detection
   apiUrl: string;
   apiKey: string;
-  model: string;
+  model: string; // Active/selected model
+  models?: string[]; // Available models for this config
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface LLMSummary {
@@ -16,6 +27,18 @@ export interface LLMSummary {
   modelUsed: string;
   totalCommits: number;
   promptUsed?: string;
+  isPartial?: boolean; // Flag for incomplete summaries
+}
+
+export interface PartialSummary {
+  summary: string;
+  modelUsed: string;
+  configId: string;
+  totalCommits: number;
+  generatedAt: string;
+  systemPrompt: string;
+  userPromptTemplate: string;
+  commits: CommitForSummary[];
 }
 
 export interface LLMTestResult {
@@ -24,31 +47,192 @@ export interface LLMTestResult {
   suggestion?: string;
 }
 
-const defaultConfig: LLMConfig = {
+const defaultConfig: Omit<LLMConfig, "id" | "name" | "createdAt" | "updatedAt"> = {
+  provider: "openai",
   apiUrl: "https://api.openai.com/v1",
   apiKey: "",
-  model: "gpt-3.5-turbo",
+  model: "",
 };
 
-export function getLLMConfig(): LLMConfig {
+// Detect provider from URL (for migration purposes)
+function detectProviderFromUrl(url: string): LLMProviderCode {
+  if (url.includes("openai.com")) return "openai";
+  if (url.includes("groq")) return "groq";
+  if (url.includes("ollama") || url.includes("localhost:11434")) return "ollama";
+  if (url.includes("together")) return "together";
+  if (url.includes("openrouter")) return "openrouter";
+  return "custom";
+}
+
+// Generate unique ID for config
+function generateConfigId(): string {
+  return `llm_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+// Migrate config to include provider field if missing
+function migrateConfig(config: any): LLMConfig {
+  if (!config.provider) {
+    config.provider = detectProviderFromUrl(config.apiUrl || "");
+  }
+  return config;
+}
+
+// Get all LLM configurations
+export function getLLMConfigs(): LLMConfig[] {
+  const stored = localStorage.getItem(LLM_CONFIGS_KEY);
+  if (stored) {
+    try {
+      const configs = JSON.parse(stored);
+      // Migrate any configs without provider field
+      const migrated = configs.map(migrateConfig);
+      // Save if any migration happened
+      if (JSON.stringify(configs) !== JSON.stringify(migrated)) {
+        saveLLMConfigs(migrated);
+      }
+      return migrated;
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+// Save all LLM configurations
+export function saveLLMConfigs(configs: LLMConfig[]): void {
+  localStorage.setItem(LLM_CONFIGS_KEY, JSON.stringify(configs));
+}
+
+// Get active configuration ID
+export function getActiveLLMConfigId(): string | null {
+  return localStorage.getItem(LLM_ACTIVE_CONFIG_KEY);
+}
+
+// Set active configuration
+export function setActiveLLMConfigId(id: string): void {
+  localStorage.setItem(LLM_ACTIVE_CONFIG_KEY, id);
+}
+
+// Add new LLM configuration
+export function addLLMConfig(config: Omit<LLMConfig, "id" | "createdAt" | "updatedAt">): LLMConfig {
+  const configs = getLLMConfigs();
+  const newConfig: LLMConfig = {
+    ...config,
+    id: generateConfigId(),
+    createdAt: new Date().toISOString(),
+  };
+  configs.push(newConfig);
+  saveLLMConfigs(configs);
+
+  // Set as active if it's the first config
+  if (configs.length === 1) {
+    setActiveLLMConfigId(newConfig.id);
+  }
+
+  return newConfig;
+}
+
+// Update existing LLM configuration
+export function updateLLMConfig(id: string, updates: Partial<Omit<LLMConfig, "id" | "createdAt">>): LLMConfig | null {
+  const configs = getLLMConfigs();
+  const index = configs.findIndex(c => c.id === id);
+
+  if (index < 0) return null;
+
+  configs[index] = {
+    ...configs[index],
+    ...updates,
+    updatedAt: new Date().toISOString(),
+  };
+
+  saveLLMConfigs(configs);
+  return configs[index];
+}
+
+// Delete LLM configuration
+export function deleteLLMConfig(id: string): boolean {
+  const configs = getLLMConfigs();
+  const filtered = configs.filter(c => c.id !== id);
+
+  if (filtered.length === configs.length) return false;
+
+  saveLLMConfigs(filtered);
+
+  // Update active config if deleted was active
+  if (getActiveLLMConfigId() === id) {
+    if (filtered.length > 0) {
+      setActiveLLMConfigId(filtered[0].id);
+    } else {
+      localStorage.removeItem(LLM_ACTIVE_CONFIG_KEY);
+    }
+  }
+
+  return true;
+}
+
+export function getLLMConfig(): LLMConfig | null {
+  // First try to get from multiple configs system
+  const configs = getLLMConfigs();
+  const activeId = getActiveLLMConfigId();
+
+  if (activeId) {
+    const activeConfig = configs.find(c => c.id === activeId);
+    if (activeConfig) return activeConfig;
+  }
+
+  // Fallback to first config if available
+  if (configs.length > 0) {
+    return configs[0];
+  }
+
+  // Legacy: Try to get from old single config format
   const stored = localStorage.getItem(LLM_CONFIG_KEY);
   if (stored) {
     try {
-      const parsed = JSON.parse(stored);
-      return { ...defaultConfig, ...parsed };
+      const legacyConfig = JSON.parse(stored);
+      const apiUrl = legacyConfig.apiUrl || defaultConfig.apiUrl;
+      // Migrate to new format
+      const newConfig: LLMConfig = {
+        id: generateConfigId(),
+        name: "Migrated Config",
+        provider: detectProviderFromUrl(apiUrl),
+        apiUrl: apiUrl,
+        apiKey: legacyConfig.apiKey || "",
+        model: legacyConfig.model || "",
+        createdAt: new Date().toISOString(),
+      };
+      saveLLMConfigs([newConfig]);
+      setActiveLLMConfigId(newConfig.id);
+      localStorage.removeItem(LLM_CONFIG_KEY);
+      return newConfig;
     } catch {
-      return defaultConfig;
+      return null;
     }
   }
-  return defaultConfig;
+  return null;
 }
 
 export function saveLLMConfig(config: LLMConfig): void {
-  localStorage.setItem(LLM_CONFIG_KEY, JSON.stringify(config));
+  const configs = getLLMConfigs();
+  const existingIndex = configs.findIndex(c => c.id === config.id);
+
+  if (existingIndex >= 0) {
+    configs[existingIndex] = { ...config, updatedAt: new Date().toISOString() };
+  } else {
+    configs.push({ ...config, createdAt: new Date().toISOString() });
+  }
+
+  saveLLMConfigs(configs);
+
+  // Set as active if it's the first config
+  if (configs.length === 1) {
+    setActiveLLMConfigId(config.id);
+  }
 }
 
 export function clearLLMConfig(): void {
   localStorage.removeItem(LLM_CONFIG_KEY);
+  localStorage.removeItem(LLM_CONFIGS_KEY);
+  localStorage.removeItem(LLM_ACTIVE_CONFIG_KEY);
 }
 
 export function getLLMSummary(): LLMSummary | null {
@@ -71,17 +255,83 @@ export function clearLLMSummary(): void {
   localStorage.removeItem(LLM_SUMMARY_KEY);
 }
 
+// Partial summary functions for continue generation
+export function savePartialSummary(partial: PartialSummary): void {
+  localStorage.setItem(LLM_PARTIAL_SUMMARY_KEY, JSON.stringify(partial));
+}
+
+export function getPartialSummary(): PartialSummary | null {
+  const stored = localStorage.getItem(LLM_PARTIAL_SUMMARY_KEY);
+  if (stored) {
+    try {
+      return JSON.parse(stored);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+export function clearPartialSummary(): void {
+  localStorage.removeItem(LLM_PARTIAL_SUMMARY_KEY);
+}
+
 export async function testLLMConnection(config: LLMConfig): Promise<LLMTestResult> {
   try {
     // Normalize URL
     const baseUrl = config.apiUrl.replace(/\/+$/, "");
 
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+
+    // Only add Authorization header if API key is provided
+    if (config.apiKey) {
+      headers["Authorization"] = `Bearer ${config.apiKey}`;
+    }
+
+    // For Ollama, use native /api/tags endpoint
+    if (config.provider === "ollama") {
+      // Remove /v1 suffix if present and use native Ollama API
+      const ollamaBaseUrl = baseUrl.replace(/\/v1$/, "");
+      const response = await fetch(`${ollamaBaseUrl}/api/tags`, {
+        method: "GET",
+        headers,
+      });
+
+      if (response.ok) {
+        return { success: true };
+      }
+
+      if (response.status === 401) {
+        return {
+          success: false,
+          error: "Unauthorized",
+          suggestion: "Check if Ollama requires authentication (uncommon for local instances).",
+        };
+      }
+
+      // Fallback to OpenAI-compatible endpoint
+      const fallbackResponse = await fetch(`${baseUrl}/models`, {
+        method: "GET",
+        headers,
+      });
+
+      if (fallbackResponse.ok) {
+        return { success: true };
+      }
+
+      return {
+        success: false,
+        error: "Cannot connect to Ollama",
+        suggestion: "Ensure Ollama is running with 'ollama serve' and the URL is correct.",
+      };
+    }
+
+    // For other providers, use OpenAI-compatible /models endpoint
     const response = await fetch(`${baseUrl}/models`, {
       method: "GET",
-      headers: {
-        Authorization: `Bearer ${config.apiKey}`,
-        "Content-Type": "application/json",
-      },
+      headers,
     });
 
     if (response.ok) {
@@ -103,7 +353,6 @@ export async function testLLMConnection(config: LLMConfig): Promise<LLMTestResul
       };
     }
 
-    const errorText = await response.text();
     return {
       success: false,
       error: `API returned ${response.status}: ${response.statusText}`,
@@ -129,12 +378,48 @@ export async function getAvailableModels(config: LLMConfig): Promise<string[]> {
   try {
     const baseUrl = config.apiUrl.replace(/\/+$/, "");
 
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+
+    // Only add Authorization header if API key is provided
+    if (config.apiKey) {
+      headers["Authorization"] = `Bearer ${config.apiKey}`;
+    }
+
+    // For Ollama, use native /api/tags endpoint for better model listing
+    if (config.provider === "ollama") {
+      // Remove /v1 suffix if present and use native Ollama API
+      const ollamaBaseUrl = baseUrl.replace(/\/v1$/, "");
+      const response = await fetch(`${ollamaBaseUrl}/api/tags`, {
+        method: "GET",
+        headers,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Ollama /api/tags returns: {"models": [{"name": "llama3:latest", ...}]}
+        return data.models?.map((model: { name: string }) => model.name).sort() || [];
+      }
+
+      // Fallback to OpenAI-compatible endpoint if /api/tags fails
+      const fallbackResponse = await fetch(`${baseUrl}/models`, {
+        method: "GET",
+        headers,
+      });
+
+      if (fallbackResponse.ok) {
+        const data = await fallbackResponse.json();
+        return data.data?.map((model: { id: string }) => model.id).sort() || [];
+      }
+
+      return [];
+    }
+
+    // For other providers, use OpenAI-compatible /models endpoint
     const response = await fetch(`${baseUrl}/models`, {
       method: "GET",
-      headers: {
-        Authorization: `Bearer ${config.apiKey}`,
-        "Content-Type": "application/json",
-      },
+      headers,
     });
 
     if (!response.ok) {
@@ -208,16 +493,22 @@ export async function generateCommitSummary(
     .join("\n");
 
   // Replace placeholders in user prompt
-  let userPrompt = userPromptTemplate
+  const userPrompt = userPromptTemplate
     .replace("{{commitCount}}", String(commits.length))
     .replace("{{commits}}", formattedCommits);
 
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  // Only add Authorization header if API key is provided
+  if (config.apiKey) {
+    headers["Authorization"] = `Bearer ${config.apiKey}`;
+  }
+
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${config.apiKey}`,
-      "Content-Type": "application/json",
-    },
+    headers,
     body: JSON.stringify({
       model: config.model,
       messages: [
@@ -259,4 +550,92 @@ export async function generateCommitSummary(
 
   const data = await response.json();
   return data.choices?.[0]?.message?.content || "";
+}
+
+// Continue generating from a partial summary
+export async function continueSummaryGeneration(
+  config: LLMConfig,
+  partialSummary: string,
+  systemPrompt: string,
+  userPromptTemplate: string,
+  commits: CommitForSummary[]
+): Promise<string> {
+  const baseUrl = config.apiUrl.replace(/\/+$/, "");
+
+  // Format commits for context (shorter version for continuation)
+  const formattedCommits = commits
+    .slice(0, 50) // Limit for continuation
+    .map((c, i) => {
+      let commitText = `${i + 1}. **${c.title}**\n`;
+      commitText += `   - Project: ${c.project} | Author: ${c.author} | Branch: ${c.branch}\n`;
+      return commitText;
+    })
+    .join("\n");
+
+  const continuePrompt = `You were generating a Git commit summary but it was interrupted. Here is the partial summary you generated:
+
+---
+${partialSummary}
+---
+
+Please continue the summary from where you left off. Do not repeat what was already written. Continue naturally and complete the summary in the same style and format.
+
+Original commits context (for reference):
+${formattedCommits}
+
+Total commits: ${commits.length}
+
+Continue the summary:`;
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  if (config.apiKey) {
+    headers["Authorization"] = `Bearer ${config.apiKey}`;
+  }
+
+  const response = await fetch(`${baseUrl}/chat/completions`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      model: config.model,
+      messages: [
+        {
+          role: "system",
+          content: systemPrompt,
+        },
+        {
+          role: "user",
+          content: continuePrompt,
+        },
+      ],
+      temperature: 0.7,
+      max_tokens: 4000,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+
+    if (response.status === 401) {
+      throw new Error("Invalid API Key. Please check your API key in LLM Settings.");
+    }
+
+    if (response.status === 404) {
+      throw new Error(`Model "${config.model}" not found. Please select a different model in LLM Settings.`);
+    }
+
+    if (response.status === 429) {
+      throw new Error("Rate limited. Please wait a moment and try again.");
+    }
+
+    throw new Error(`API request failed (${response.status}): ${errorText || response.statusText}`);
+  }
+
+  const data = await response.json();
+  const continuation = data.choices?.[0]?.message?.content || "";
+
+  // Combine partial with continuation
+  return partialSummary + "\n\n" + continuation;
 }

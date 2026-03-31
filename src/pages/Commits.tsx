@@ -7,11 +7,30 @@ import {
   CommitWithProject,
 } from "../services/scraper";
 import { isDebugMode } from "../services/settings";
+import ErrorDisplay from "../components/ErrorDisplay";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { GitLabError } from "../services/gitlab";
+import NewScrapeDialog from "../components/NewScrapeDialog";
+import {
+  Plus,
+  Download,
+  Sparkles,
+  GitBranch,
+} from "lucide-react";
 
-export default function ScrapeResults() {
+export default function Commits() {
   const navigate = useNavigate();
   const [commits, setCommits] = useState<CommitWithProject[]>([]);
-  const [config, setConfig] = useState<{
+  const [scraperConfig, setScraperConfig] = useState<{
     projectIds: number[];
     sinceDate: string;
     untilDate: string;
@@ -19,6 +38,8 @@ export default function ScrapeResults() {
     includeDiffs?: boolean;
     scrapedAt: string;
   } | null>(null);
+
+  // Filters for results table
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProject, setSelectedProject] = useState<string>("all");
   const [selectedAuthor, setSelectedAuthor] = useState<string>("all");
@@ -26,14 +47,23 @@ export default function ScrapeResults() {
   const [sortField, setSortField] = useState<string>("created_at");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
+  // New Scrape Dialog state
+  const [showNewScrapeDialog, setShowNewScrapeDialog] = useState(false);
+  const [error, setError] = useState<GitLabError | null>(null);
+
+  // Load commits on mount
   useEffect(() => {
+    loadCommits();
+  }, []);
+
+  const loadCommits = () => {
     const storedCommits = getScrapedCommits();
     const storedConfig = getScraperConfig();
     setCommits(storedCommits);
-    setConfig(storedConfig);
-  }, []);
+    setScraperConfig(storedConfig);
+  };
 
-  // Get unique projects, authors, and branches for filters
+  // Get unique values for filters
   const uniqueProjects = useMemo(() => {
     const projects = new Set(commits.map((c) => c.projectName));
     return Array.from(projects).sort();
@@ -63,7 +93,6 @@ export default function ScrapeResults() {
   const filteredCommits = useMemo(() => {
     let result = [...commits];
 
-    // Filter by search query
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       result = result.filter(
@@ -76,22 +105,18 @@ export default function ScrapeResults() {
       );
     }
 
-    // Filter by project
     if (selectedProject !== "all") {
       result = result.filter((c) => c.projectName === selectedProject);
     }
 
-    // Filter by author
     if (selectedAuthor !== "all") {
       result = result.filter((c) => c.author_name === selectedAuthor);
     }
 
-    // Filter by branch
     if (selectedBranch !== "all") {
       result = result.filter((c) => c.branch === selectedBranch);
     }
 
-    // Sort
     result.sort((a, b) => {
       let aVal: string | number;
       let bVal: string | number;
@@ -147,6 +172,7 @@ export default function ScrapeResults() {
     }
   };
 
+  // Export CSV
   const handleExportCSV = () => {
     const hasDiffs = commits.some((c) => c.diffs && c.diffs.length > 0);
     const headers = ["Project", "Branch", "Author", "Commit ID", "Title", "Date", "URL", hasDiffs ? "Files Changed" : ""].filter(Boolean);
@@ -181,200 +207,199 @@ export default function ScrapeResults() {
     URL.revokeObjectURL(url);
   };
 
-  const handleClearAndNewScrape = () => {
-    clearScrapedCommits();
-    navigate("/commits");
-  };
-
   const handleSummarize = () => {
     navigate("/commits/summary");
   };
 
+  const handleClearCommits = () => {
+    clearScrapedCommits();
+    setCommits([]);
+    setScraperConfig(null);
+  };
+
+  // Empty state
   if (commits.length === 0) {
     return (
       <div className="space-y-6">
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-          <p className="text-yellow-700">
-            No scraped commits found. Go to{" "}
-            <button
-              onClick={() => navigate("/commits")}
-              className="underline font-medium text-yellow-800 hover:text-yellow-900"
-            >
-              Commit Scraper
-            </button>{" "}
-            to scrape commits from GitLab.
+        {/* Error Display */}
+        {error && <ErrorDisplay error={error} />}
+
+        {/* Empty State */}
+        <div className="bg-card rounded-lg border border-border p-8 text-center">
+          <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <GitBranch className="h-8 w-8 text-primary" />
+          </div>
+          <h3 className="text-lg font-medium text-foreground mb-2">
+            No Commits Scraped Yet
+          </h3>
+          <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+            Start by scraping commits from your GitLab projects. You can filter by branch, date range, and include file change details.
           </p>
+          <Button onClick={() => setShowNewScrapeDialog(true)} size="lg">
+            <Plus className="h-5 w-5 mr-2" />
+            New Scrape
+          </Button>
         </div>
+
+        {/* New Scrape Dialog */}
+        <NewScrapeDialog
+          open={showNewScrapeDialog}
+          onOpenChange={setShowNewScrapeDialog}
+          onComplete={loadCommits}
+          onError={setError}
+        />
       </div>
     );
   }
 
+  // Results view
   return (
     <div className="space-y-6">
+      {/* Error Display */}
+      {error && <ErrorDisplay error={error} />}
+
       {/* Header with stats */}
-      <div className="bg-white rounded-lg shadow p-4">
+      <div className="bg-card rounded-lg border border-border p-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-gray-800">
+            <h2 className="text-lg font-semibold text-foreground">
               Scraped Commits
             </h2>
-            {config && (
-              <p className="text-sm text-gray-500 mt-1">
-                Scraped at: {new Date(config.scrapedAt).toLocaleString()}
-                {config.branch && ` | Branch: ${config.branch}`}
-                {config.sinceDate && ` | Since: ${config.sinceDate}`}
-                {config.untilDate && ` | Until: ${config.untilDate}`}
-                {config.includeDiffs !== undefined && ` | Diffs: ${config.includeDiffs ? "Yes" : "No"}`}
+            {scraperConfig && (
+              <p className="text-sm text-muted-foreground mt-1">
+                Scraped at: {new Date(scraperConfig.scrapedAt).toLocaleString()}
+                {scraperConfig.branch && ` | Branch: ${scraperConfig.branch}`}
+                {scraperConfig.sinceDate && ` | Since: ${scraperConfig.sinceDate}`}
+                {scraperConfig.untilDate && ` | Until: ${scraperConfig.untilDate}`}
+                {scraperConfig.includeDiffs !== undefined && ` | Diffs: ${scraperConfig.includeDiffs ? "Yes" : "No"}`}
               </p>
             )}
           </div>
           <div className="flex gap-2">
-            <button
-              onClick={handleExportCSV}
-              className="px-3 py-1.5 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
-            >
+            <Button variant="secondary" onClick={handleExportCSV}>
+              <Download className="h-4 w-4 mr-2" />
               Export CSV
-            </button>
-            <button
-              onClick={handleSummarize}
-              className="px-3 py-1.5 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors text-sm"
-            >
-              🤖 AI Summary
-            </button>
-            <button
-              onClick={handleClearAndNewScrape}
-              className="px-3 py-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
-            >
+            </Button>
+            <Button onClick={handleSummarize}>
+              <Sparkles className="h-4 w-4 mr-2" />
+              AI Summary
+            </Button>
+            <Button variant="outline" onClick={() => setShowNewScrapeDialog(true)}>
+              <Plus className="h-4 w-4 mr-2" />
               New Scrape
-            </button>
+            </Button>
           </div>
         </div>
 
         {/* Stats */}
         <div className="flex flex-wrap gap-4 mt-4 text-sm">
-          <div className="bg-blue-50 px-3 py-1.5 rounded">
-            <span className="text-blue-600 font-medium">{commits.length}</span>
-            <span className="text-blue-500 ml-1">total commits</span>
+          <div className="bg-primary/10 px-3 py-1.5 rounded">
+            <span className="text-primary font-medium">{commits.length}</span>
+            <span className="text-primary/70 ml-1">total commits</span>
           </div>
-          <div className="bg-purple-50 px-3 py-1.5 rounded">
-            <span className="text-purple-600 font-medium">
-              {uniqueProjects.length}
-            </span>
-            <span className="text-purple-500 ml-1">projects</span>
+          <div className="bg-purple-500/10 px-3 py-1.5 rounded">
+            <span className="text-purple-600 font-medium">{uniqueProjects.length}</span>
+            <span className="text-purple-500/70 ml-1">projects</span>
           </div>
-          <div className="bg-green-50 px-3 py-1.5 rounded">
-            <span className="text-green-600 font-medium">
-              {uniqueAuthors.length}
-            </span>
-            <span className="text-green-500 ml-1">authors</span>
+          <div className="bg-green-500/10 px-3 py-1.5 rounded">
+            <span className="text-green-600 font-medium">{uniqueAuthors.length}</span>
+            <span className="text-green-500/70 ml-1">authors</span>
           </div>
-          <div className="bg-indigo-50 px-3 py-1.5 rounded">
-            <span className="text-indigo-600 font-medium">
-              {uniqueBranches.length}
-            </span>
-            <span className="text-indigo-500 ml-1">branches</span>
+          <div className="bg-indigo-500/10 px-3 py-1.5 rounded">
+            <span className="text-indigo-600 font-medium">{uniqueBranches.length}</span>
+            <span className="text-indigo-500/70 ml-1">branches</span>
           </div>
           {filesChangedCount > 0 && (
-            <div className="bg-teal-50 px-3 py-1.5 rounded">
-              <span className="text-teal-600 font-medium">
-                {filesChangedCount}
-              </span>
-              <span className="text-teal-500 ml-1">files changed</span>
+            <div className="bg-teal-500/10 px-3 py-1.5 rounded">
+              <span className="text-teal-600 font-medium">{filesChangedCount}</span>
+              <span className="text-teal-500/70 ml-1">files changed</span>
             </div>
           )}
-          <div className="bg-orange-50 px-3 py-1.5 rounded">
-            <span className="text-orange-600 font-medium">
-              {filteredCommits.length}
-            </span>
-            <span className="text-orange-500 ml-1">filtered</span>
+          <div className="bg-orange-500/10 px-3 py-1.5 rounded">
+            <span className="text-orange-600 font-medium">{filteredCommits.length}</span>
+            <span className="text-orange-500/70 ml-1">filtered</span>
           </div>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-lg shadow p-4">
+      <div className="bg-card rounded-lg border border-border p-4">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           {/* Search */}
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Search
-            </label>
-            <input
+          <div className="md:col-span-2 space-y-2">
+            <Label>Search</Label>
+            <Input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by title, author, branch, commit ID..."
-              className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           {/* Project filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Project
-            </label>
-            <select
-              value={selectedProject}
-              onChange={(e) => setSelectedProject(e.target.value)}
-              className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">All Projects</option>
-              {uniqueProjects.map((project) => (
-                <option key={project} value={project}>
-                  {project}
-                </option>
-              ))}
-            </select>
+          <div className="space-y-2">
+            <Label>Project</Label>
+            <Select value={selectedProject} onValueChange={setSelectedProject}>
+              <SelectTrigger>
+                <SelectValue placeholder="All Projects" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Projects</SelectItem>
+                {uniqueProjects.map((project) => (
+                  <SelectItem key={project} value={project}>
+                    {project}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Branch filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Branch
-            </label>
-            <select
-              value={selectedBranch}
-              onChange={(e) => setSelectedBranch(e.target.value)}
-              className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">All Branches</option>
-              {uniqueBranches.map((branch) => (
-                <option key={branch} value={branch}>
-                  {branch}
-                </option>
-              ))}
-            </select>
+          <div className="space-y-2">
+            <Label>Branch</Label>
+            <Select value={selectedBranch} onValueChange={setSelectedBranch}>
+              <SelectTrigger>
+                <SelectValue placeholder="All Branches" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Branches</SelectItem>
+                {uniqueBranches.map((branch) => (
+                  <SelectItem key={branch} value={branch}>
+                    {branch}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Author filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Author
-            </label>
-            <select
-              value={selectedAuthor}
-              onChange={(e) => setSelectedAuthor(e.target.value)}
-              className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">All Authors</option>
-              {uniqueAuthors.map((author) => (
-                <option key={author} value={author}>
-                  {author}
-                </option>
-              ))}
-            </select>
+          <div className="space-y-2">
+            <Label>Author</Label>
+            <Select value={selectedAuthor} onValueChange={setSelectedAuthor}>
+              <SelectTrigger>
+                <SelectValue placeholder="All Authors" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Authors</SelectItem>
+                {uniqueAuthors.map((author) => (
+                  <SelectItem key={author} value={author}>
+                    {author}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
       </div>
 
       {/* Data Table */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-card rounded-lg border border-border overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50">
+            <thead className="bg-muted/50">
               <tr>
                 <th
-                  className="p-3 text-left font-medium text-gray-600 cursor-pointer hover:bg-gray-100"
+                  className="p-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
                   onClick={() => toggleSort("projectName")}
                 >
                   <div className="flex items-center gap-1">
@@ -385,7 +410,7 @@ export default function ScrapeResults() {
                   </div>
                 </th>
                 <th
-                  className="p-3 text-left font-medium text-gray-600 cursor-pointer hover:bg-gray-100"
+                  className="p-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
                   onClick={() => toggleSort("branch")}
                 >
                   <div className="flex items-center gap-1">
@@ -396,7 +421,7 @@ export default function ScrapeResults() {
                   </div>
                 </th>
                 <th
-                  className="p-3 text-left font-medium text-gray-600 cursor-pointer hover:bg-gray-100"
+                  className="p-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
                   onClick={() => toggleSort("author_name")}
                 >
                   <div className="flex items-center gap-1">
@@ -406,11 +431,11 @@ export default function ScrapeResults() {
                     )}
                   </div>
                 </th>
-                <th className="p-3 text-left font-medium text-gray-600">
+                <th className="p-3 text-left font-medium text-muted-foreground">
                   Commit
                 </th>
                 <th
-                  className="p-3 text-left font-medium text-gray-600 cursor-pointer hover:bg-gray-100"
+                  className="p-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
                   onClick={() => toggleSort("title")}
                 >
                   <div className="flex items-center gap-1">
@@ -421,7 +446,7 @@ export default function ScrapeResults() {
                   </div>
                 </th>
                 <th
-                  className="p-3 text-left font-medium text-gray-600 cursor-pointer hover:bg-gray-100"
+                  className="p-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
                   onClick={() => toggleSort("created_at")}
                 >
                   <div className="flex items-center gap-1">
@@ -433,39 +458,39 @@ export default function ScrapeResults() {
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody className="divide-y divide-border">
               {filteredCommits.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-4 text-center text-gray-500">
+                  <td colSpan={6} className="p-4 text-center text-muted-foreground">
                     No commits match your filters
                   </td>
                 </tr>
               ) : (
                 filteredCommits.map((commit) => (
-                  <tr key={commit.id} className="hover:bg-gray-50">
-                    <td className="p-3 text-gray-800 max-w-xs truncate">
+                  <tr key={commit.id} className="hover:bg-muted/50">
+                    <td className="p-3 text-foreground max-w-xs truncate">
                       {commit.projectName}
                     </td>
                     <td className="p-3">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-700">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary">
                         {commit.branch || "N/A"}
                       </span>
                     </td>
-                    <td className="p-3 text-gray-600">{commit.author_name}</td>
+                    <td className="p-3 text-muted-foreground">{commit.author_name}</td>
                     <td className="p-3">
                       <a
                         href={commit.web_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-blue-500 hover:underline font-mono"
+                        className="text-primary hover:underline font-mono"
                       >
                         {commit.short_id}
                       </a>
                     </td>
-                    <td className="p-3 text-gray-600 max-w-md truncate">
+                    <td className="p-3 text-muted-foreground max-w-md truncate">
                       {commit.title}
                     </td>
-                    <td className="p-3 text-gray-500">
+                    <td className="p-3 text-muted-foreground">
                       {new Date(commit.created_at).toLocaleDateString()}
                     </td>
                   </tr>
@@ -475,17 +500,16 @@ export default function ScrapeResults() {
           </table>
         </div>
 
-        {/* Pagination info */}
-        <div className="p-3 bg-gray-50 text-sm text-gray-500">
+        <div className="p-3 bg-muted/50 text-sm text-muted-foreground">
           Showing {filteredCommits.length} of {commits.length} commits
         </div>
       </div>
 
       {/* Debug info */}
       {isDebugMode() && (
-        <div className="bg-gray-100 rounded-lg p-4">
-          <h3 className="font-medium text-gray-800 mb-2">Debug Info</h3>
-          <pre className="text-xs text-gray-600 overflow-auto">
+        <div className="bg-muted rounded-lg p-4">
+          <h3 className="font-medium text-foreground mb-2">Debug Info</h3>
+          <pre className="text-xs text-muted-foreground overflow-auto">
             {JSON.stringify(
               {
                 totalCommits: commits.length,
@@ -494,7 +518,7 @@ export default function ScrapeResults() {
                 authors: uniqueAuthors.length,
                 branches: uniqueBranches.length,
                 filesChanged: filesChangedCount,
-                config,
+                scraperConfig,
               },
               null,
               2
@@ -502,6 +526,14 @@ export default function ScrapeResults() {
           </pre>
         </div>
       )}
+
+      {/* New Scrape Dialog */}
+      <NewScrapeDialog
+        open={showNewScrapeDialog}
+        onOpenChange={setShowNewScrapeDialog}
+        onComplete={loadCommits}
+        onError={setError}
+      />
     </div>
   );
 }

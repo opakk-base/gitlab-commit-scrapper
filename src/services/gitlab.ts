@@ -1,8 +1,14 @@
 const GITLAB_CONFIG_KEY = "gitlab_config";
+const GITLAB_CONFIGS_KEY = "gitlab_configs";
+const GITLAB_ACTIVE_CONFIG_KEY = "gitlab_active_config";
 
 export interface GitLabConfig {
+  id: string;
+  name: string;
   url: string;
   pat: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface GitLabProject {
@@ -174,10 +180,37 @@ function parseGitLabError(
 }
 
 export function getGitLabConfig(): GitLabConfig | null {
+  // First try to get from multiple configs system
+  const configs = getGitLabConfigs();
+  const activeId = getActiveGitLabConfigId();
+
+  if (activeId) {
+    const activeConfig = configs.find(c => c.id === activeId);
+    if (activeConfig) return activeConfig;
+  }
+
+  // Fallback to first config if available
+  if (configs.length > 0) {
+    return configs[0];
+  }
+
+  // Legacy: Try to get from old single config format
   const stored = localStorage.getItem(GITLAB_CONFIG_KEY);
   if (stored) {
     try {
-      return JSON.parse(stored);
+      const legacyConfig = JSON.parse(stored);
+      // Migrate to new format
+      const newConfig: GitLabConfig = {
+        id: generateConfigId(),
+        name: "Migrated Config",
+        url: legacyConfig.url || "",
+        pat: legacyConfig.pat || "",
+        createdAt: new Date().toISOString(),
+      };
+      saveGitLabConfigs([newConfig]);
+      setActiveGitLabConfigId(newConfig.id);
+      localStorage.removeItem(GITLAB_CONFIG_KEY);
+      return newConfig;
     } catch {
       return null;
     }
@@ -186,11 +219,117 @@ export function getGitLabConfig(): GitLabConfig | null {
 }
 
 export function saveGitLabConfig(config: GitLabConfig): void {
-  localStorage.setItem(GITLAB_CONFIG_KEY, JSON.stringify(config));
+  const configs = getGitLabConfigs();
+  const existingIndex = configs.findIndex(c => c.id === config.id);
+
+  if (existingIndex >= 0) {
+    configs[existingIndex] = { ...config, updatedAt: new Date().toISOString() };
+  } else {
+    configs.push({ ...config, createdAt: new Date().toISOString() });
+  }
+
+  saveGitLabConfigs(configs);
+
+  // Set as active if it's the first config
+  if (configs.length === 1) {
+    setActiveGitLabConfigId(config.id);
+  }
 }
 
 export function clearGitLabConfig(): void {
   localStorage.removeItem(GITLAB_CONFIG_KEY);
+  localStorage.removeItem(GITLAB_CONFIGS_KEY);
+  localStorage.removeItem(GITLAB_ACTIVE_CONFIG_KEY);
+}
+
+// Generate unique ID for config
+function generateConfigId(): string {
+  return `gitlab_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+// Get all GitLab configurations
+export function getGitLabConfigs(): GitLabConfig[] {
+  const stored = localStorage.getItem(GITLAB_CONFIGS_KEY);
+  if (stored) {
+    try {
+      return JSON.parse(stored);
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+// Save all GitLab configurations
+export function saveGitLabConfigs(configs: GitLabConfig[]): void {
+  localStorage.setItem(GITLAB_CONFIGS_KEY, JSON.stringify(configs));
+}
+
+// Get active configuration ID
+export function getActiveGitLabConfigId(): string | null {
+  return localStorage.getItem(GITLAB_ACTIVE_CONFIG_KEY);
+}
+
+// Set active configuration
+export function setActiveGitLabConfigId(id: string): void {
+  localStorage.setItem(GITLAB_ACTIVE_CONFIG_KEY, id);
+}
+
+// Add new GitLab configuration
+export function addGitLabConfig(config: Omit<GitLabConfig, "id" | "createdAt" | "updatedAt">): GitLabConfig {
+  const configs = getGitLabConfigs();
+  const newConfig: GitLabConfig = {
+    ...config,
+    id: generateConfigId(),
+    createdAt: new Date().toISOString(),
+  };
+  configs.push(newConfig);
+  saveGitLabConfigs(configs);
+
+  // Set as active if it's the first config
+  if (configs.length === 1) {
+    setActiveGitLabConfigId(newConfig.id);
+  }
+
+  return newConfig;
+}
+
+// Update existing GitLab configuration
+export function updateGitLabConfig(id: string, updates: Partial<Omit<GitLabConfig, "id" | "createdAt">>): GitLabConfig | null {
+  const configs = getGitLabConfigs();
+  const index = configs.findIndex(c => c.id === id);
+
+  if (index < 0) return null;
+
+  configs[index] = {
+    ...configs[index],
+    ...updates,
+    updatedAt: new Date().toISOString(),
+  };
+
+  saveGitLabConfigs(configs);
+  return configs[index];
+}
+
+// Delete GitLab configuration
+export function deleteGitLabConfig(id: string): boolean {
+  const configs = getGitLabConfigs();
+  const filtered = configs.filter(c => c.id !== id);
+
+  if (filtered.length === configs.length) return false;
+
+  saveGitLabConfigs(filtered);
+
+  // Update active config if deleted was active
+  if (getActiveGitLabConfigId() === id) {
+    if (filtered.length > 0) {
+      setActiveGitLabConfigId(filtered[0].id);
+    } else {
+      localStorage.removeItem(GITLAB_ACTIVE_CONFIG_KEY);
+    }
+  }
+
+  return true;
 }
 
 export async function testGitLabConnection(config: GitLabConfig): Promise<{

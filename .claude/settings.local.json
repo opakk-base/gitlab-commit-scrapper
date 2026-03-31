@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(curl -s \"https://ui.shadcn.com/docs/components/sidebar\")",
+      "Bash(printf \"Radix\\\\nNova\\\\n\")",
+      "Bash(npx shadcn@latest init)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)"
+    ]
+  }
+}
