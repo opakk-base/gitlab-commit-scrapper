@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { useState, createContext, useContext, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { StatusBar } from "@/components/StatusBar";
 import { cn } from "@/lib/utils";
 import {
   Home,
@@ -261,6 +262,9 @@ export default function Layout({ children }: LayoutProps) {
           {/* Content */}
           <main className="flex-1 overflow-auto p-6 bg-background">{children}</main>
         </div>
+
+        {/* Status Bar */}
+        <StatusBar />
       </div>
     </SidebarContext.Provider>
   );

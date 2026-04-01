@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import {
@@ -20,6 +20,7 @@ import {
   getCustomPrompt,
   saveCustomPrompt,
   getDefaultCustomPrompt,
+  getScraperConfig,
   CommitWithProject,
 } from "../services/scraper";
 import { isDebugMode } from "../services/settings";
@@ -33,6 +34,15 @@ import {
   addSummaryHistory,
   SummaryHistoryItem,
 } from "../services/summaryHistory";
+import {
+  startBackgroundTask,
+  updateBackgroundTask,
+  getBackgroundTask,
+  clearBackgroundTask,
+  setAbortController,
+  BackgroundTask,
+} from "../services/backgroundTask";
+import { useBackgroundTask } from "@/contexts/BackgroundTaskContext";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -59,11 +69,13 @@ import {
   ChevronDown,
   Check,
   Play,
+  AlertCircle,
 } from "lucide-react";
 
 export default function CommitSummary() {
   const navigate = useNavigate();
   const summaryRef = useRef<HTMLDivElement>(null);
+  const { task, clearTask, updateProgress, completeTask, failTask } = useBackgroundTask();
   const [commits, setCommits] = useState<CommitWithProject[]>([]);
   const [existingSummary, setExistingSummary] = useState<LLMSummary | null>(
     null,
@@ -73,7 +85,6 @@ export default function CommitSummary() {
   const [showPromptDialog, setShowPromptDialog] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showModelMenu, setShowModelMenu] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [rawResponse, setRawResponse] = useState<string | null>(null);
@@ -87,6 +98,18 @@ export default function CommitSummary() {
   const [partialSummary, setPartialSummary] =
     useState<ReturnType<typeof getPartialSummary>>(null);
   const [continuing, setContinuing] = useState(false);
+
+  // Track if we started a background task
+  const generationRef = useRef<{
+    taskId: string | null;
+    config: LLMConfig | null;
+    modelToUse: string;
+    commitsForSummary: CommitForSummary[];
+    scraperConfig: ReturnType<typeof getScraperConfig>;
+  } | null>(null);
+
+  // Derive loading state from background task
+  const loading = task?.status === "running" && task?.type === "summary";
 
   useEffect(() => {
     const scrapedCommits = getScrapedCommits();
@@ -104,6 +127,27 @@ export default function CommitSummary() {
       setActiveConfig(config);
       setSelectedModel(config.model);
       setAvailableModels(config.models || [config.model].filter(Boolean));
+    }
+
+    // Check for completed background task and load result
+    const bgTask = getBackgroundTask();
+    if (bgTask?.status === "completed" && bgTask.result?.summary) {
+      const taskSummary: LLMSummary = {
+        summary: bgTask.result.summary,
+        keyPoints: [],
+        topContributors: [],
+        projectBreakdown: [],
+        generatedAt: bgTask.completedAt || new Date().toISOString(),
+        modelUsed: bgTask.result.modelUsed || "",
+        totalCommits: bgTask.result.totalCommits || 0,
+      };
+      saveLLMSummary(taskSummary);
+      setExistingSummary(taskSummary);
+      setRawResponse(bgTask.result.summary);
+      clearBackgroundTask();
+    } else if (bgTask?.status === "error") {
+      setError(bgTask.error || "Generation failed");
+      clearBackgroundTask();
     }
   }, []);
 
@@ -138,7 +182,6 @@ export default function CommitSummary() {
       return;
     }
 
-    setLoading(true);
     setError(null);
     setRawResponse(null);
     setShowModelMenu(false);
@@ -161,9 +204,33 @@ export default function CommitSummary() {
       })),
     }));
 
+    const scraperConfig = getScraperConfig();
+
+    // Start background task
+    const bgTask = startBackgroundTask({
+      type: "summary",
+      status: "running",
+      progress: 0,
+      message: "Initializing summary generation...",
+      startedAt: new Date().toISOString(),
+    });
+
+    // Store generation context for background processing
+    generationRef.current = {
+      taskId: bgTask.id,
+      config,
+      modelToUse,
+      commitsForSummary,
+      scraperConfig,
+    };
+
+    // Create abort controller for cancellation
+    const abortController = new AbortController();
+    setAbortController(abortController);
+
     // Save context before API call (for potential continuation)
     savePartialSummary({
-      summary: "", // Will be filled on success or error
+      summary: "",
       modelUsed: modelToUse,
       configId: config.id,
       totalCommits: commits.length,
@@ -174,6 +241,12 @@ export default function CommitSummary() {
     });
 
     try {
+      // Update progress
+      updateBackgroundTask(bgTask.id, {
+        progress: 10,
+        message: "Sending request to AI model...",
+      });
+
       // Create config with selected model
       const configWithModel = { ...config, model: modelToUse };
 
@@ -183,7 +256,18 @@ export default function CommitSummary() {
         customPrompt.systemPrompt,
         customPrompt.userPromptTemplate,
       );
-      setRawResponse(response);
+
+      // Check if cancelled
+      const currentTask = getBackgroundTask();
+      if (currentTask?.cancelRequested) {
+        return;
+      }
+
+      // Update progress
+      updateBackgroundTask(bgTask.id, {
+        progress: 90,
+        message: "Processing response...",
+      });
 
       const summary: LLMSummary = {
         summary: response,
@@ -198,6 +282,7 @@ export default function CommitSummary() {
 
       saveLLMSummary(summary);
       setExistingSummary(summary);
+      setRawResponse(response);
       setSelectedModel(modelToUse);
 
       // Save to history
@@ -214,22 +299,61 @@ export default function CommitSummary() {
           uniqueProjects: stats.uniqueProjects,
           filesWithChanges: stats.filesWithChanges,
         },
+        scrapeDateRange: scraperConfig ? {
+          since: scraperConfig.sinceDate,
+          until: scraperConfig.untilDate,
+        } : undefined,
+      });
+
+      // Complete background task
+      updateBackgroundTask(bgTask.id, {
+        status: "completed",
+        progress: 100,
+        message: "Summary generated successfully!",
+        completedAt: new Date().toISOString(),
+        result: {
+          summary: response,
+          modelUsed: modelToUse,
+          configName: config.name,
+          configId: config.id,
+          totalCommits: commits.length,
+          projectStats: {
+            totalCommits: commits.length,
+            uniqueContributors: stats.uniqueContributors,
+            uniqueProjects: stats.uniqueProjects,
+            filesWithChanges: stats.filesWithChanges,
+          },
+          scrapeDateRange: scraperConfig ? {
+            since: scraperConfig.sinceDate,
+            until: scraperConfig.untilDate,
+          } : undefined,
+        },
       });
 
       // Clear partial summary on success
       clearPartialSummary();
       setPartialSummary(null);
     } catch (err) {
+      // Check if cancelled
+      if (abortController.signal.aborted) {
+        return;
+      }
+
       // Keep the partial summary context for continuation
       const partial = getPartialSummary();
       if (partial) {
         setPartialSummary(partial);
       }
-      setError(
-        err instanceof Error ? err.message : "Failed to generate summary",
-      );
-    } finally {
-      setLoading(false);
+
+      const errorMessage = err instanceof Error ? err.message : "Failed to generate summary";
+      setError(errorMessage);
+
+      // Fail background task
+      updateBackgroundTask(bgTask.id, {
+        status: "error",
+        error: errorMessage,
+        completedAt: new Date().toISOString(),
+      });
     }
   };
 
@@ -291,6 +415,7 @@ export default function CommitSummary() {
       setPartialSummary(null);
 
       // Save to history
+      const scraperConfig = getScraperConfig();
       addSummaryHistory({
         summary: response,
         modelUsed: partialSummary.modelUsed,
@@ -304,6 +429,10 @@ export default function CommitSummary() {
           uniqueProjects: stats.uniqueProjects,
           filesWithChanges: stats.filesWithChanges,
         },
+        scrapeDateRange: scraperConfig ? {
+          since: scraperConfig.sinceDate,
+          until: scraperConfig.untilDate,
+        } : undefined,
       });
     } catch (err) {
       setError(

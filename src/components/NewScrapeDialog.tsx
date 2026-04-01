@@ -504,22 +504,14 @@ export function NewScrapeDialog({
                 </div>
               ) : (
                 <>
-                  <div className="flex items-center justify-between bg-muted/50 px-4 py-2 rounded-lg">
-                    <span className="text-sm font-medium">
-                      {
-                        Object.keys(rowSelection).filter((k) => rowSelection[k])
-                          .length
-                      }{" "}
-                      of {projects.length} projects selected
-                    </span>
-                  </div>
-
                   <DataTable
                     columns={projectColumns}
                     data={projects}
                     rowSelection={rowSelection}
                     onRowSelectionChange={setRowSelection}
                     getRowId={(row) => String(row.id)}
+                    searchPlaceholder="Search projects by name..."
+                    searchColumn="name"
                   />
                 </>
               )}

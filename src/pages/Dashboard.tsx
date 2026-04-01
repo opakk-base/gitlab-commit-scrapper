@@ -3,6 +3,7 @@ import {
   getSummaryHistory,
   deleteSummaryHistory,
   clearSummaryHistory,
+  addSummaryHistory,
   SummaryHistoryItem,
 } from "../services/summaryHistory";
 import {
@@ -11,6 +12,8 @@ import {
   exportHistoryAsPDF,
   exportHistoryAsDOCX,
 } from "../services/export";
+import { getLLMConfig, humanizeText, LLMConfig } from "../services/llm";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -20,6 +23,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { RefineDialog, RefineStyle, RefineResult } from "@/components/RefineDialog";
 import ReactMarkdown from "react-markdown";
 import {
   Download,
@@ -32,6 +36,9 @@ import {
   FolderOpen,
   FileCode,
   AlertCircle,
+  Wand2,
+  RefreshCw,
+  Calendar,
 } from "lucide-react";
 
 export default function Dashboard() {
@@ -43,9 +50,14 @@ export default function Dashboard() {
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
   const [exporting, setExporting] = useState<string | null>(null);
   const [showExportMenu, setShowExportMenu] = useState<string | null>(null);
+  const [refining, setRefining] = useState(false);
+  const [showRefineDialog, setShowRefineDialog] = useState(false);
+  const [llmConfig, setLlmConfig] = useState<LLMConfig | null>(null);
 
   useEffect(() => {
     loadHistory();
+    const config = getLLMConfig();
+    setLlmConfig(config);
   }, []);
 
   const loadHistory = () => {
@@ -76,6 +88,59 @@ export default function Dashboard() {
     clearSummaryHistory();
     loadHistory();
     setShowClearDialog(false);
+  };
+
+  const handleRefine = async (result: RefineResult) => {
+    if (!selectedItem || !llmConfig) {
+      toast.error("No LLM configuration available. Please configure LLM settings first.");
+      return;
+    }
+
+    // Prevent refining already refined summaries
+    if (selectedItem.type === "refined") {
+      toast.error("This summary is already refined. Only original summaries can be refined.");
+      return;
+    }
+
+    setRefining(true);
+    setShowRefineDialog(false);
+
+    try {
+      const refinedText = await humanizeText(llmConfig, selectedItem.summary, {
+        style: result.style,
+        customPrompt: result.customPrompt,
+        modelOverride: result.model,
+      });
+
+      // Save refined summary to history
+      addSummaryHistory({
+        summary: refinedText,
+        modelUsed: result.model,
+        configName: llmConfig.name,
+        configId: llmConfig.id,
+        totalCommits: selectedItem.totalCommits,
+        generatedAt: new Date().toISOString(),
+        projectStats: selectedItem.projectStats,
+        type: "refined",
+        refinedFromId: selectedItem.id,
+        scrapeDateRange: selectedItem.scrapeDateRange,
+      });
+
+      loadHistory();
+      toast.success("Summary refined successfully!");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to refine summary");
+    } finally {
+      setRefining(false);
+    }
+  };
+
+  const openRefineDialog = () => {
+    if (!llmConfig) {
+      toast.error("No LLM configuration available. Please configure LLM settings first.");
+      return;
+    }
+    setShowRefineDialog(true);
   };
 
   const handleExport = async (item: SummaryHistoryItem, format: "txt" | "csv" | "pdf" | "docx") => {
@@ -244,6 +309,12 @@ export default function Dashboard() {
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-600/10 text-green-600 rounded text-xs">
                         {item.totalCommits} commits
                       </span>
+                      {item.type === "refined" && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-600/10 text-purple-600 rounded text-xs">
+                          <Wand2 className="h-3 w-3" />
+                          Refined
+                        </span>
+                      )}
                     </div>
 
                     {item.projectStats && (
@@ -259,6 +330,16 @@ export default function Dashboard() {
                         <span className="flex items-center gap-1">
                           <FileCode className="h-3 w-3" />
                           {item.projectStats.filesWithChanges} files
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Scrape date range */}
+                    {item.scrapeDateRange && (
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                        <Calendar className="h-3 w-3" />
+                        <span>
+                          {new Date(item.scrapeDateRange.since).toLocaleDateString()} - {new Date(item.scrapeDateRange.until).toLocaleDateString()}
                         </span>
                       </div>
                     )}
@@ -387,6 +468,30 @@ export default function Dashboard() {
                   )}
                 </div>
 
+                {/* Refined indicator */}
+                {selectedItem.type === "refined" && (
+                  <div className="flex items-center gap-2 bg-purple-600/10 rounded-lg p-3">
+                    <Wand2 className="h-4 w-4 text-purple-600" />
+                    <span className="text-sm text-purple-600 font-medium">Refined Summary</span>
+                    <span className="text-xs text-purple-600/70">
+                      (Humanized version using {selectedItem.modelUsed})
+                    </span>
+                  </div>
+                )}
+
+                {/* Scrape date range */}
+                {selectedItem.scrapeDateRange && (
+                  <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-3">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">
+                      Commits from:
+                    </span>
+                    <span className="text-sm font-medium text-foreground">
+                      {new Date(selectedItem.scrapeDateRange.since).toLocaleDateString()} - {new Date(selectedItem.scrapeDateRange.until).toLocaleDateString()}
+                    </span>
+                  </div>
+                )}
+
                 {/* Summary content */}
                 <div className="bg-card rounded-lg border border-border">
                   <div className="p-4 border-b border-border">
@@ -446,6 +551,26 @@ export default function Dashboard() {
           {/* Footer */}
           <div className="px-6 py-4 border-t border-border bg-muted/30 flex items-center justify-between flex-shrink-0">
             <div className="flex items-center gap-2">
+              {selectedItem?.type !== "refined" && llmConfig && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={openRefineDialog}
+                  disabled={refining}
+                >
+                  {refining ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Refining...
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 className="h-4 w-4 mr-2" />
+                      Refine
+                    </>
+                  )}
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -477,6 +602,15 @@ export default function Dashboard() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Refine Dialog */}
+      <RefineDialog
+        open={showRefineDialog}
+        onOpenChange={setShowRefineDialog}
+        onRefine={handleRefine}
+        llmConfig={llmConfig}
+        isRefining={refining}
+      />
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

@@ -12,6 +12,12 @@ export interface SummaryHistoryItem {
     uniqueProjects: number;
     filesWithChanges: number;
   };
+  type?: "original" | "refined";
+  refinedFromId?: string;
+  scrapeDateRange?: {
+    since: string;
+    until: string;
+  };
 }
 
 const SUMMARY_HISTORY_KEY = "summary_history";

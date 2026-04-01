@@ -639,3 +639,115 @@ Continue the summary:`;
   // Combine partial with continuation
   return partialSummary + "\n\n" + continuation;
 }
+
+export interface HumanizeOptions {
+  style?: "professional" | "casual" | "concise" | "custom";
+  customPrompt?: string;
+  modelOverride?: string;
+}
+
+export async function humanizeText(
+  config: LLMConfig,
+  originalText: string,
+  options?: HumanizeOptions
+): Promise<string> {
+  const baseUrl = config.apiUrl.replace(/\/+$/, "");
+  const style = options?.style || "professional";
+  const modelToUse = options?.modelOverride || config.model;
+
+  let systemPrompt: string;
+  let userPrompt: string;
+
+  if (style === "custom" && options?.customPrompt) {
+    // Custom prompt mode
+    systemPrompt = `You are an expert text editor. Your task is to rewrite the given text according to the user's custom instructions.
+
+Important guidelines:
+1. Follow the user's instructions precisely
+2. Preserve all factual information unless instructed otherwise
+3. Maintain the Markdown formatting structure
+4. Output ONLY the rewritten text, no explanations or meta-comments`;
+
+    userPrompt = `${options.customPrompt}
+
+---
+${originalText}
+---
+
+Rewritten version:`;
+  } else {
+    // Preset style mode
+    systemPrompt = `You are an expert text editor specializing in humanizing AI-generated content. Your task is to rewrite the given text to make it sound more natural, human-written, and engaging while preserving all the information.
+
+Guidelines for humanizing:
+1. Remove robotic, formulaic, or overly structured AI-like phrasing
+2. Add natural transitions and flow between sections
+3. Use varied sentence structures - mix short and long sentences
+4. Replace generic introductions with more engaging openings
+5. Add contextual nuances that a human writer would naturally include
+6. Keep the same factual information - don't add or remove facts
+7. Maintain the Markdown formatting structure
+8. Use conversational yet ${style === "casual" ? "friendly and relaxed" : style === "concise" ? "clear and direct" : "professional"} language
+9. Avoid phrases like "In conclusion", "Furthermore", "Additionally" unless they feel natural
+10. Make bullet points feel less mechanical when appropriate
+
+Important: Output ONLY the humanized text, no explanations or meta-comments.`;
+
+    userPrompt = `Please humanize the following AI-generated summary, making it sound more natural and human-written while keeping all the information intact. Use a ${style} tone.
+
+---
+${originalText}
+---
+
+Humanized version:`;
+  }
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  if (config.apiKey) {
+    headers["Authorization"] = `Bearer ${config.apiKey}`;
+  }
+
+  const response = await fetch(`${baseUrl}/chat/completions`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      model: modelToUse,
+      messages: [
+        {
+          role: "system",
+          content: systemPrompt,
+        },
+        {
+          role: "user",
+          content: userPrompt,
+        },
+      ],
+      temperature: 0.8,
+      max_tokens: 4000,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+
+    if (response.status === 401) {
+      throw new Error("Invalid API Key. Please check your API key in LLM Settings.");
+    }
+
+    if (response.status === 404) {
+      throw new Error(`Model "${modelToUse}" not found. Please select a different model in LLM Settings.`);
+    }
+
+    if (response.status === 429) {
+      throw new Error("Rate limited. Please wait a moment and try again.");
+    }
+
+    throw new Error(`API request failed (${response.status}): ${errorText || response.statusText}`);
+  }
+
+  const data = await response.json();
+  return data.choices?.[0]?.message?.content || "";
+}
