@@ -6,7 +6,8 @@
       "Bash(printf \"Radix\\\\nNova\\\\n\")",
       "Bash(npx shadcn@latest init)",
       "Bash(npm install:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(ls -la D:/dev/opakk/gitlab-commit-scrapper/forge.config.*)"
     ]
   }
 }
