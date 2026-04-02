@@ -21,9 +21,12 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter,
 } from "@/components/ui/dialog";
-import { RefineDialog, RefineStyle, RefineResult } from "@/components/RefineDialog";
+import {
+  RefineDialog,
+  RefineStyle,
+  RefineResult,
+} from "@/components/RefineDialog";
 import ReactMarkdown from "react-markdown";
 import {
   Download,
@@ -43,7 +46,9 @@ import {
 
 export default function Dashboard() {
   const [history, setHistory] = useState<SummaryHistoryItem[]>([]);
-  const [selectedItem, setSelectedItem] = useState<SummaryHistoryItem | null>(null);
+  const [selectedItem, setSelectedItem] = useState<SummaryHistoryItem | null>(
+    null,
+  );
   const [showViewDialog, setShowViewDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showClearDialog, setShowClearDialog] = useState(false);
@@ -92,13 +97,17 @@ export default function Dashboard() {
 
   const handleRefine = async (result: RefineResult) => {
     if (!selectedItem || !llmConfig) {
-      toast.error("No LLM configuration available. Please configure LLM settings first.");
+      toast.error(
+        "No LLM configuration available. Please configure LLM settings first.",
+      );
       return;
     }
 
     // Prevent refining already refined summaries
     if (selectedItem.type === "refined") {
-      toast.error("This summary is already refined. Only original summaries can be refined.");
+      toast.error(
+        "This summary is already refined. Only original summaries can be refined.",
+      );
       return;
     }
 
@@ -129,7 +138,9 @@ export default function Dashboard() {
       loadHistory();
       toast.success("Summary refined successfully!");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to refine summary");
+      toast.error(
+        err instanceof Error ? err.message : "Failed to refine summary",
+      );
     } finally {
       setRefining(false);
     }
@@ -137,13 +148,18 @@ export default function Dashboard() {
 
   const openRefineDialog = () => {
     if (!llmConfig) {
-      toast.error("No LLM configuration available. Please configure LLM settings first.");
+      toast.error(
+        "No LLM configuration available. Please configure LLM settings first.",
+      );
       return;
     }
     setShowRefineDialog(true);
   };
 
-  const handleExport = async (item: SummaryHistoryItem, format: "txt" | "csv" | "pdf" | "docx") => {
+  const handleExport = async (
+    item: SummaryHistoryItem,
+    format: "txt" | "csv" | "pdf" | "docx",
+  ) => {
     setExporting(format);
     setShowExportMenu(null);
 
@@ -193,7 +209,10 @@ export default function Dashboard() {
 
   // Stats for the dashboard header
   const totalSummaries = history.length;
-  const totalCommitsAnalyzed = history.reduce((sum, item) => sum + item.totalCommits, 0);
+  const totalCommitsAnalyzed = history.reduce(
+    (sum, item) => sum + item.totalCommits,
+    0,
+  );
   const uniqueConfigs = new Set(history.map((item) => item.configId)).size;
   const uniqueModels = new Set(history.map((item) => item.modelUsed)).size;
 
@@ -208,7 +227,9 @@ export default function Dashboard() {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Total Summaries</p>
-              <p className="text-2xl font-bold text-foreground">{totalSummaries}</p>
+              <p className="text-2xl font-bold text-foreground">
+                {totalSummaries}
+              </p>
             </div>
           </div>
         </div>
@@ -220,7 +241,9 @@ export default function Dashboard() {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Commits Analyzed</p>
-              <p className="text-2xl font-bold text-foreground">{totalCommitsAnalyzed}</p>
+              <p className="text-2xl font-bold text-foreground">
+                {totalCommitsAnalyzed}
+              </p>
             </div>
           </div>
         </div>
@@ -232,7 +255,9 @@ export default function Dashboard() {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Configurations</p>
-              <p className="text-2xl font-bold text-foreground">{uniqueConfigs}</p>
+              <p className="text-2xl font-bold text-foreground">
+                {uniqueConfigs}
+              </p>
             </div>
           </div>
         </div>
@@ -244,7 +269,9 @@ export default function Dashboard() {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Models Used</p>
-              <p className="text-2xl font-bold text-foreground">{uniqueModels}</p>
+              <p className="text-2xl font-bold text-foreground">
+                {uniqueModels}
+              </p>
             </div>
           </div>
         </div>
@@ -254,7 +281,9 @@ export default function Dashboard() {
       <div className="bg-card rounded-lg border border-border">
         <div className="p-4 border-b border-border flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-foreground">Summary History</h3>
+            <h3 className="text-lg font-semibold text-foreground">
+              Summary History
+            </h3>
             <p className="text-sm text-muted-foreground">
               {history.length > 0
                 ? `${history.length} summaries generated`
@@ -262,7 +291,11 @@ export default function Dashboard() {
             </p>
           </div>
           {history.length > 0 && (
-            <Button variant="outline" size="sm" onClick={() => setShowClearDialog(true)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowClearDialog(true)}
+            >
               <Trash2 className="h-4 w-4 mr-2" />
               Clear All
             </Button>
@@ -274,7 +307,9 @@ export default function Dashboard() {
             <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
               <FileText className="h-8 w-8 text-muted-foreground" />
             </div>
-            <h3 className="text-lg font-medium text-foreground mb-2">No Summary History</h3>
+            <h3 className="text-lg font-medium text-foreground mb-2">
+              No Summary History
+            </h3>
             <p className="text-muted-foreground mb-4">
               Generate summaries in the AI Summary page to see them here.
             </p>
@@ -339,7 +374,13 @@ export default function Dashboard() {
                       <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
                         <Calendar className="h-3 w-3" />
                         <span>
-                          {new Date(item.scrapeDateRange.since).toLocaleDateString()} - {new Date(item.scrapeDateRange.until).toLocaleDateString()}
+                          {new Date(
+                            item.scrapeDateRange.since,
+                          ).toLocaleDateString()}{" "}
+                          -{" "}
+                          {new Date(
+                            item.scrapeDateRange.until,
+                          ).toLocaleDateString()}
                         </span>
                       </div>
                     )}
@@ -364,7 +405,11 @@ export default function Dashboard() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => setShowExportMenu(showExportMenu === item.id ? null : item.id)}
+                        onClick={() =>
+                          setShowExportMenu(
+                            showExportMenu === item.id ? null : item.id,
+                          )
+                        }
                         disabled={!!exporting}
                       >
                         {exporting ? (
@@ -434,9 +479,12 @@ export default function Dashboard() {
                 <FileText className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <DialogTitle className="text-lg font-semibold">Summary Details</DialogTitle>
+                <DialogTitle className="text-lg font-semibold">
+                  Summary Details
+                </DialogTitle>
                 <DialogDescription className="text-sm text-muted-foreground">
-                  Generated on {selectedItem && formatDate(selectedItem.generatedAt)}
+                  Generated on{" "}
+                  {selectedItem && formatDate(selectedItem.generatedAt)}
                 </DialogDescription>
               </div>
             </div>
@@ -450,20 +498,34 @@ export default function Dashboard() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="bg-muted/50 rounded-lg p-3">
                     <p className="text-xs text-muted-foreground mb-1">Model</p>
-                    <p className="font-medium text-foreground text-sm truncate">{selectedItem.modelUsed}</p>
+                    <p className="font-medium text-foreground text-sm truncate">
+                      {selectedItem.modelUsed}
+                    </p>
                   </div>
                   <div className="bg-muted/50 rounded-lg p-3">
-                    <p className="text-xs text-muted-foreground mb-1">Configuration</p>
-                    <p className="font-medium text-foreground text-sm truncate">{selectedItem.configName}</p>
+                    <p className="text-xs text-muted-foreground mb-1">
+                      Configuration
+                    </p>
+                    <p className="font-medium text-foreground text-sm truncate">
+                      {selectedItem.configName}
+                    </p>
                   </div>
                   <div className="bg-muted/50 rounded-lg p-3">
-                    <p className="text-xs text-muted-foreground mb-1">Commits</p>
-                    <p className="font-medium text-foreground text-sm">{selectedItem.totalCommits}</p>
+                    <p className="text-xs text-muted-foreground mb-1">
+                      Commits
+                    </p>
+                    <p className="font-medium text-foreground text-sm">
+                      {selectedItem.totalCommits}
+                    </p>
                   </div>
                   {selectedItem.projectStats && (
                     <div className="bg-muted/50 rounded-lg p-3">
-                      <p className="text-xs text-muted-foreground mb-1">Contributors</p>
-                      <p className="font-medium text-foreground text-sm">{selectedItem.projectStats.uniqueContributors}</p>
+                      <p className="text-xs text-muted-foreground mb-1">
+                        Contributors
+                      </p>
+                      <p className="font-medium text-foreground text-sm">
+                        {selectedItem.projectStats.uniqueContributors}
+                      </p>
                     </div>
                   )}
                 </div>
@@ -472,7 +534,9 @@ export default function Dashboard() {
                 {selectedItem.type === "refined" && (
                   <div className="flex items-center gap-2 bg-purple-600/10 rounded-lg p-3">
                     <Wand2 className="h-4 w-4 text-purple-600" />
-                    <span className="text-sm text-purple-600 font-medium">Refined Summary</span>
+                    <span className="text-sm text-purple-600 font-medium">
+                      Refined Summary
+                    </span>
                     <span className="text-xs text-purple-600/70">
                       (Humanized version using {selectedItem.modelUsed})
                     </span>
@@ -487,7 +551,13 @@ export default function Dashboard() {
                       Commits from:
                     </span>
                     <span className="text-sm font-medium text-foreground">
-                      {new Date(selectedItem.scrapeDateRange.since).toLocaleDateString()} - {new Date(selectedItem.scrapeDateRange.until).toLocaleDateString()}
+                      {new Date(
+                        selectedItem.scrapeDateRange.since,
+                      ).toLocaleDateString()}{" "}
+                      -{" "}
+                      {new Date(
+                        selectedItem.scrapeDateRange.until,
+                      ).toLocaleDateString()}
                     </span>
                   </div>
                 )}
@@ -502,22 +572,34 @@ export default function Dashboard() {
                       <ReactMarkdown
                         components={{
                           h1: ({ children }) => (
-                            <h1 className="text-2xl font-bold text-foreground mt-6 mb-4 first:mt-0">{children}</h1>
+                            <h1 className="text-2xl font-bold text-foreground mt-6 mb-4 first:mt-0">
+                              {children}
+                            </h1>
                           ),
                           h2: ({ children }) => (
-                            <h2 className="text-xl font-bold text-foreground mt-5 mb-3 first:mt-0">{children}</h2>
+                            <h2 className="text-xl font-bold text-foreground mt-5 mb-3 first:mt-0">
+                              {children}
+                            </h2>
                           ),
                           h3: ({ children }) => (
-                            <h3 className="text-lg font-semibold text-foreground mt-4 mb-2 first:mt-0">{children}</h3>
+                            <h3 className="text-lg font-semibold text-foreground mt-4 mb-2 first:mt-0">
+                              {children}
+                            </h3>
                           ),
                           p: ({ children }) => (
-                            <p className="text-muted-foreground leading-relaxed mb-3">{children}</p>
+                            <p className="text-muted-foreground leading-relaxed mb-3">
+                              {children}
+                            </p>
                           ),
                           ul: ({ children }) => (
-                            <ul className="list-disc list-inside text-muted-foreground space-y-1 mb-3 ml-2">{children}</ul>
+                            <ul className="list-disc list-inside text-muted-foreground space-y-1 mb-3 ml-2">
+                              {children}
+                            </ul>
                           ),
                           li: ({ children }) => (
-                            <li className="text-muted-foreground">{children}</li>
+                            <li className="text-muted-foreground">
+                              {children}
+                            </li>
                           ),
                           code: ({ className, children }) => {
                             const isInline = !className;
@@ -535,7 +617,9 @@ export default function Dashboard() {
                             );
                           },
                           strong: ({ children }) => (
-                            <strong className="font-semibold text-foreground">{children}</strong>
+                            <strong className="font-semibold text-foreground">
+                              {children}
+                            </strong>
                           ),
                         }}
                       >
@@ -574,7 +658,9 @@ export default function Dashboard() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => selectedItem && handleExport(selectedItem, "txt")}
+                onClick={() =>
+                  selectedItem && handleExport(selectedItem, "txt")
+                }
               >
                 <Download className="h-4 w-4 mr-2" />
                 Text
@@ -582,7 +668,9 @@ export default function Dashboard() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => selectedItem && handleExport(selectedItem, "pdf")}
+                onClick={() =>
+                  selectedItem && handleExport(selectedItem, "pdf")
+                }
               >
                 <Download className="h-4 w-4 mr-2" />
                 PDF
@@ -590,13 +678,18 @@ export default function Dashboard() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => selectedItem && handleExport(selectedItem, "docx")}
+                onClick={() =>
+                  selectedItem && handleExport(selectedItem, "docx")
+                }
               >
                 <Download className="h-4 w-4 mr-2" />
                 Word
               </Button>
             </div>
-            <Button variant="secondary" onClick={() => setShowViewDialog(false)}>
+            <Button
+              variant="secondary"
+              onClick={() => setShowViewDialog(false)}
+            >
               Close
             </Button>
           </div>
@@ -614,41 +707,86 @@ export default function Dashboard() {
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Summary</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete this summary from history? This action cannot be undone.
-            </DialogDescription>
+        <DialogContent className="max-w-md flex flex-col p-0 gap-0 overflow-hidden">
+          {/* Header */}
+          <DialogHeader className="px-6 pt-6 pb-4 border-b border-border flex-shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-destructive/10 rounded-lg flex items-center justify-center">
+                <Trash2 className="h-5 w-5 text-destructive" />
+              </div>
+              <div>
+                <DialogTitle className="text-lg font-semibold">
+                  Delete Summary
+                </DialogTitle>
+                <DialogDescription className="text-sm text-muted-foreground">
+                  This action cannot be undone
+                </DialogDescription>
+              </div>
+            </div>
           </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
+
+          {/* Content */}
+          <div className="px-6 py-4">
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to delete this summary from history? The
+              summary will be permanently removed.
+            </p>
+          </div>
+
+          {/* Footer */}
+          <div className="px-6 py-4 border-t border-border bg-muted/30 flex items-center justify-end gap-3 flex-shrink-0">
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteDialog(false)}
+            >
               Cancel
             </Button>
             <Button variant="destructive" onClick={handleDelete}>
+              <Trash2 className="h-4 w-4 mr-2" />
               Delete
             </Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
       {/* Clear All Confirmation Dialog */}
       <Dialog open={showClearDialog} onOpenChange={setShowClearDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Clear All History</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to clear all summary history? This will delete {history.length} summaries and cannot be undone.
-            </DialogDescription>
+        <DialogContent className="max-w-md flex flex-col p-0 gap-0 overflow-hidden">
+          {/* Header */}
+          <DialogHeader className="px-6 pt-6 pb-4 border-b border-border flex-shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-destructive/10 rounded-lg flex items-center justify-center">
+                <AlertCircle className="h-5 w-5 text-destructive" />
+              </div>
+              <div>
+                <DialogTitle className="text-lg font-semibold">
+                  Clear All History
+                </DialogTitle>
+                <DialogDescription className="text-sm text-muted-foreground">
+                  {history.length} summaries will be deleted
+                </DialogDescription>
+              </div>
+            </div>
           </DialogHeader>
-          <DialogFooter>
+
+          {/* Content */}
+          <div className="px-6 py-4">
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to clear all summary history? All summaries
+              will be permanently removed and cannot be recovered.
+            </p>
+          </div>
+
+          {/* Footer */}
+          <div className="px-6 py-4 border-t border-border bg-muted/30 flex items-center justify-end gap-3 flex-shrink-0">
             <Button variant="outline" onClick={() => setShowClearDialog(false)}>
               Cancel
             </Button>
             <Button variant="destructive" onClick={handleClearAll}>
+              <Trash2 className="h-4 w-4 mr-2" />
               Clear All
             </Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

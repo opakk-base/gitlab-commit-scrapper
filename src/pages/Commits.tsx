@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { GitLabError } from "../services/gitlab";
 import NewScrapeDialog from "../components/NewScrapeDialog";
+import CommitDetailDialog from "../components/CommitDetailDialog";
 import {
   Plus,
   Download,
@@ -50,6 +51,15 @@ export default function Commits() {
   // New Scrape Dialog state
   const [showNewScrapeDialog, setShowNewScrapeDialog] = useState(false);
   const [error, setError] = useState<GitLabError | null>(null);
+
+  // Commit Detail Dialog state
+  const [selectedCommit, setSelectedCommit] = useState<CommitWithProject | null>(null);
+  const [showDetailDialog, setShowDetailDialog] = useState(false);
+
+  const handleCommitClick = (commit: CommitWithProject) => {
+    setSelectedCommit(commit);
+    setShowDetailDialog(true);
+  };
 
   // Load commits on mount
   useEffect(() => {
@@ -467,7 +477,11 @@ export default function Commits() {
                 </tr>
               ) : (
                 filteredCommits.map((commit) => (
-                  <tr key={commit.id} className="hover:bg-muted/50">
+                  <tr
+                    key={commit.id}
+                    className="hover:bg-muted/50 cursor-pointer transition-colors"
+                    onClick={() => handleCommitClick(commit)}
+                  >
                     <td className="p-3 text-foreground max-w-xs truncate">
                       {commit.projectName}
                     </td>
@@ -478,14 +492,9 @@ export default function Commits() {
                     </td>
                     <td className="p-3 text-muted-foreground">{commit.author_name}</td>
                     <td className="p-3">
-                      <a
-                        href={commit.web_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary hover:underline font-mono"
-                      >
+                      <span className="text-primary hover:underline font-mono">
                         {commit.short_id}
-                      </a>
+                      </span>
                     </td>
                     <td className="p-3 text-muted-foreground max-w-md truncate">
                       {commit.title}
@@ -533,6 +542,13 @@ export default function Commits() {
         onOpenChange={setShowNewScrapeDialog}
         onComplete={loadCommits}
         onError={setError}
+      />
+
+      {/* Commit Detail Dialog */}
+      <CommitDetailDialog
+        open={showDetailDialog}
+        onOpenChange={setShowDetailDialog}
+        commit={selectedCommit}
       />
     </div>
   );
