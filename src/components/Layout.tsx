@@ -261,10 +261,10 @@ export default function Layout({ children }: LayoutProps) {
 
           {/* Content */}
           <main className="flex-1 overflow-auto p-6 bg-background">{children}</main>
-        </div>
 
-        {/* Status Bar */}
-        <StatusBar />
+          {/* Status Bar — VS Code style bottom bar */}
+          <StatusBar />
+        </div>
       </div>
     </SidebarContext.Provider>
   );

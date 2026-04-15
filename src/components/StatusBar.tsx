@@ -3,39 +3,20 @@ import { useNavigate } from "react-router-dom";
 import { useBackgroundTask } from "@/contexts/BackgroundTaskContext";
 import { requestCancelTask } from "@/services/backgroundTask";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import {
   CheckCircle2,
   XCircle,
   Loader2,
   X,
   ExternalLink,
-  Bot,
   Sparkles,
-  ChevronUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function StatusBar() {
   const { task, clearTask } = useBackgroundTask();
   const navigate = useNavigate();
-  const [isVisible, setIsVisible] = useState(false);
-  const [isOpen, setIsOpen] = useState(false);
-
-  // Handle visibility
-  useEffect(() => {
-    if (task) {
-      setIsVisible(true);
-    } else {
-      setIsVisible(false);
-    }
-  }, [task]);
 
   // Show notification on completion
   useEffect(() => {
@@ -57,7 +38,6 @@ export function StatusBar() {
   const handleCancel = () => {
     requestCancelTask();
     clearTask();
-    setIsOpen(false);
   };
 
   const handleView = () => {
@@ -65,188 +45,138 @@ export function StatusBar() {
       navigate("/commits/summary");
     }
     clearTask();
-    setIsOpen(false);
   };
 
   const handleDismiss = () => {
     clearTask();
-    setIsOpen(false);
   };
-
-  if (!task) return null;
 
   const getStatusIcon = () => {
-    switch (task.status) {
+    switch (task?.status) {
       case "running":
-        return <Loader2 className="h-5 w-5 animate-spin text-primary" />;
+        return <Loader2 className="h-3.5 w-3.5 animate-spin" />;
       case "completed":
-        return <CheckCircle2 className="h-5 w-5 text-green-500" />;
+        return <CheckCircle2 className="h-3.5 w-3.5" />;
       case "error":
-        return <XCircle className="h-5 w-5 text-destructive" />;
+        return <XCircle className="h-3.5 w-3.5" />;
       default:
-        return <Bot className="h-5 w-5 text-muted-foreground" />;
+        return <Sparkles className="h-3.5 w-3.5" />;
     }
   };
 
-  const getButtonColor = () => {
-    switch (task.status) {
+  const getStatusColor = () => {
+    switch (task?.status) {
       case "running":
-        return "bg-primary hover:bg-primary/90";
+        return "text-primary";
       case "completed":
-        return "bg-green-500 hover:bg-green-600";
+        return "text-green-500";
       case "error":
-        return "bg-destructive hover:bg-destructive/90";
+        return "text-destructive";
       default:
-        return "bg-muted hover:bg-muted/80";
-    }
-  };
-
-  const getProgressColor = () => {
-    switch (task.status) {
-      case "completed":
-        return "bg-green-500";
-      case "error":
-        return "bg-destructive";
-      default:
-        return "bg-primary";
+        return "text-muted-foreground";
     }
   };
 
   return (
-    <div
-      className={cn(
-        "fixed bottom-4 right-4 z-50 transition-all duration-300 ease-in-out",
-        isVisible ? "translate-y-0 opacity-100" : "translate-y-20 opacity-0 pointer-events-none"
-      )}
-    >
-      <Popover open={isOpen} onOpenChange={setIsOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            className={cn(
-              "w-14 h-14 rounded-full shadow-lg transition-all duration-200",
-              getButtonColor()
-            )}
-            size="icon"
-          >
-            {getStatusIcon()}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent
-          className="w-80 p-0"
-          align="end"
-          side="top"
-          sideOffset={8}
-        >
-          {/* Header */}
-          <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
-            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10">
-              <Sparkles className="h-4 w-4 text-primary" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground">
-                {task.type === "summary" ? "Summary Generation" : "Text Refinement"}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Started {new Date(task.startedAt).toLocaleTimeString()}
-              </p>
-            </div>
-            <div
-              className={cn(
-                "text-xs px-2 py-0.5 rounded font-medium",
-                task.status === "running"
-                  ? "bg-primary/10 text-primary"
-                  : task.status === "completed"
-                  ? "bg-green-500/10 text-green-500"
-                  : "bg-destructive/10 text-destructive"
-              )}
-            >
-              {task.status.charAt(0).toUpperCase() + task.status.slice(1)}
-            </div>
-          </div>
-
-          {/* Content */}
-          <div className="p-4 space-y-3">
-            {/* Status Message */}
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-foreground truncate flex-1">
-                {task.message}
+    <footer className="relative flex h-6 shrink-0 items-center border-t border-border bg-card text-xs select-none">
+      {/* Left section */}
+      <div className="flex items-center gap-2 flex-1 min-w-0 px-2">
+        {task ? (
+          <>
+            {/* Status icon + message */}
+            <div className={cn("flex items-center gap-1.5", getStatusColor())}>
+              {getStatusIcon()}
+              <span className="truncate">
+                {task.message || (task.type === "summary" ? "Summary Generation" : "Text Refinement")}
               </span>
-              {task.status === "running" && (
-                <span className="text-sm font-medium text-primary ml-2">
-                  {task.progress}%
-                </span>
-              )}
             </div>
 
-            {/* Progress Bar */}
-            {task.status === "running" && (
-              <Progress
-                value={task.progress}
-                className="h-2"
-              />
-            )}
 
-            {/* Result Info */}
+            {/* Model + commits info */}
             {task.status === "completed" && task.result && (
-              <div className="bg-muted/50 rounded-lg p-3 space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Model</span>
-                  <span className="font-mono text-foreground">{task.result.modelUsed}</span>
-                </div>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Commits</span>
-                  <span className="text-foreground">{task.result.totalCommits}</span>
-                </div>
-              </div>
+              <span className="text-muted-foreground hidden sm:inline">
+                — {task.result.modelUsed} • {task.result.totalCommits} commits
+              </span>
             )}
 
-            {/* Error Message */}
+            {/* Error snippet */}
             {task.status === "error" && task.error && (
-              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
-                <p className="text-xs text-destructive">{task.error}</p>
-              </div>
+              <span className="text-destructive/70 truncate hidden sm:inline">
+                — {task.error}
+              </span>
             )}
-          </div>
+          </>
+        ) : (
+          <span className="text-muted-foreground flex items-center gap-1.5">
+            <Sparkles className="h-3 w-3" />
+            Ready
+          </span>
+        )}
+      </div>
 
-          {/* Footer */}
-          <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-border bg-muted/30">
-            {task.status === "running" && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleCancel}
-                className="text-xs"
+      {/* Indeterminate progress bar — sliding shimmer */}
+      {task?.status === "running" && (
+        <div className="absolute left-0 right-0 top-0 h-[2px] bg-muted overflow-hidden">
+          <div
+            className="h-full w-1/3 bg-primary rounded-full"
+            style={{
+              animation: "statusbar-slide 1.5s ease-in-out infinite",
+            }}
+          />
+          <style>{`
+            @keyframes statusbar-slide {
+              0% { transform: translateX(-100%); }
+              100% { transform: translateX(400%); }
+            }
+          `}</style>
+        </div>
+      )}
+
+      {/* Right section — actions */}
+      {task && (
+        <div className="flex items-center gap-0.5 px-1 border-l border-border">
+          {task.status === "running" && (
+            <button
+              onClick={handleCancel}
+              className="flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              title="Cancel"
+            >
+              <X className="h-3 w-3" />
+              <span className="hidden sm:inline">Cancel</span>
+            </button>
+          )}
+          {task.status === "completed" && (
+            <>
+              <button
+                onClick={handleView}
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                title="View Result"
               >
-                <X className="h-3 w-3 mr-1" />
-                Cancel
-              </Button>
-            )}
-            {(task.status === "completed" || task.status === "error") && (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleDismiss}
-                  className="text-xs"
-                >
-                  Dismiss
-                </Button>
-                {task.status === "completed" && (
-                  <Button
-                    size="sm"
-                    onClick={handleView}
-                    className="text-xs"
-                  >
-                    <ExternalLink className="h-3 w-3 mr-1" />
-                    View Result
-                  </Button>
-                )}
-              </>
-            )}
-          </div>
-        </PopoverContent>
-      </Popover>
-    </div>
+                <ExternalLink className="h-3 w-3" />
+                <span className="hidden sm:inline">View</span>
+              </button>
+              <button
+                onClick={handleDismiss}
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                title="Dismiss"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </>
+          )}
+          {task.status === "error" && (
+            <button
+              onClick={handleDismiss}
+              className="flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              title="Dismiss"
+            >
+              <X className="h-3 w-3" />
+              <span className="hidden sm:inline">Dismiss</span>
+            </button>
+          )}
+        </div>
+      )}
+    </footer>
   );
 }
 

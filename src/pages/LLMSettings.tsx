@@ -457,20 +457,10 @@ export default function LLMSettings() {
               return (
                 <div
                   key={config.id}
-                  className={`p-4 ${config.id === activeConfigId ? "bg-primary/5" : ""}`}
+                  className={`p-4 border-l-4 ${config.id === activeConfigId ? "border-l-primary bg-primary/5" : "border-l-transparent opacity-75"}`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3 flex-1">
-                      <button
-                        onClick={() => handleSelectConfig(config.id)}
-                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
-                          config.id === activeConfigId
-                            ? "border-primary bg-primary text-primary-foreground"
-                            : "border-muted-foreground hover:border-primary"
-                        }`}
-                      >
-                        {config.id === activeConfigId && <Check className="h-3 w-3" />}
-                      </button>
                       <span className="text-2xl">{providerInfo.icon}</span>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
@@ -489,15 +479,36 @@ export default function LLMSettings() {
                         <p className="text-sm text-muted-foreground truncate">
                           {providerInfo.name} • {config.apiUrl}
                         </p>
-                        {config.model && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Model: {config.model}
-                            {config.models && config.models.length > 1 && ` (+${config.models.length - 1} more)`}
-                          </p>
-                        )}
+                        {(config.models && config.models.length > 0) ? (
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {config.models.map((model) => (
+                              <span
+                                key={model}
+                                className="inline-flex items-center px-2 py-0.5 bg-muted text-muted-foreground rounded text-xs font-mono"
+                              >
+                                {model}
+                              </span>
+                            ))}
+                          </div>
+                        ) : config.model ? (
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            <span className="inline-flex items-center px-2 py-0.5 bg-muted text-muted-foreground rounded text-xs font-mono">
+                              {config.model}
+                            </span>
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
+                      {config.id !== activeConfigId && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleSelectConfig(config.id)}
+                        >
+                          Set Active
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"
