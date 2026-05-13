@@ -1,8 +1,11 @@
+import { isDebugMode } from "./settings";
+
 const LLM_CONFIG_KEY = "llm_config";
 const LLM_CONFIGS_KEY = "llm_configs";
 const LLM_ACTIVE_CONFIG_KEY = "llm_active_config";
 const LLM_SUMMARY_KEY = "llm_summary";
 const LLM_PARTIAL_SUMMARY_KEY = "llm_partial_summary";
+const LLM_LAST_RAW_RESPONSE_KEY = "llm_last_raw_response";
 
 export type LLMProviderCode = "openai" | "azure" | "ollama" | "groq" | "together" | "openrouter" | "custom";
 
@@ -276,6 +279,87 @@ export function clearPartialSummary(): void {
   localStorage.removeItem(LLM_PARTIAL_SUMMARY_KEY);
 }
 
+export function getLastRawLLMResponse(): string | null {
+  return localStorage.getItem(LLM_LAST_RAW_RESPONSE_KEY);
+}
+
+export function clearLastRawLLMResponse(): void {
+  localStorage.removeItem(LLM_LAST_RAW_RESPONSE_KEY);
+}
+
+async function parseChatCompletionResponse(response: Response): Promise<string> {
+  const raw = await response.text();
+  const trimmed = raw.trim();
+
+  if (isDebugMode()) {
+    try {
+      localStorage.setItem(LLM_LAST_RAW_RESPONSE_KEY, raw.slice(0, 50000));
+    } catch {}
+  }
+
+  if (!trimmed) {
+    throw new Error("Empty response from LLM API.");
+  }
+
+  const isJsonObject = trimmed.startsWith("{") && !trimmed.startsWith("data:");
+  if (isJsonObject) {
+    try {
+      const data = JSON.parse(trimmed);
+      const content =
+        data.choices?.[0]?.message?.content ||
+        data.choices?.[0]?.delta?.content ||
+        data.message?.content ||
+        data.response ||
+        "";
+      if (content) return content;
+    } catch (e) {
+      throw new Error(
+        `Failed to parse LLM response: ${e instanceof Error ? e.message : String(e)}. First 200 chars: ${trimmed.slice(0, 200)}`
+      );
+    }
+  }
+
+  if (trimmed.includes("data:")) {
+    const lines = trimmed.split("\n");
+    let fullContent = "";
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+      if (!trimmedLine || !trimmedLine.startsWith("data:")) continue;
+      if (trimmedLine === "data: [DONE]") continue;
+      const jsonStr = trimmedLine.replace(/^data:\s*/, "");
+      try {
+        const chunk = JSON.parse(jsonStr);
+        const chunkContent =
+          chunk.choices?.[0]?.delta?.content ||
+          chunk.choices?.[0]?.message?.content ||
+          "";
+        fullContent += chunkContent;
+      } catch {}
+    }
+    if (fullContent) return fullContent;
+  }
+
+  const lines = trimmed.split("\n").filter((l) => l.trim().startsWith("{"));
+  if (lines.length > 0) {
+    let fullContent = "";
+    for (const line of lines) {
+      try {
+        const obj = JSON.parse(line);
+        fullContent +=
+          obj.message?.content ||
+          obj.choices?.[0]?.delta?.content ||
+          obj.response ||
+          "";
+      } catch {}
+    }
+    if (fullContent) return fullContent;
+  }
+
+  throw new Error(
+    `Received malformed response from LLM. The API may have returned a streaming or invalid payload. First 200 chars: ${trimmed.slice(0, 200)}`
+  );
+}
+
 export async function testLLMConnection(config: LLMConfig): Promise<LLMTestResult> {
   try {
     // Normalize URL
@@ -523,6 +607,7 @@ export async function generateCommitSummary(
       ],
       temperature: 0.7,
       max_tokens: 4000,
+      stream: false,
     }),
   });
 
@@ -548,8 +633,7 @@ export async function generateCommitSummary(
     throw new Error(`API request failed (${response.status}): ${errorText || response.statusText}`);
   }
 
-  const data = await response.json();
-  return data.choices?.[0]?.message?.content || "";
+  return await parseChatCompletionResponse(response);
 }
 
 // Continue generating from a partial summary
@@ -612,6 +696,7 @@ Continue the summary:`;
       ],
       temperature: 0.7,
       max_tokens: 4000,
+      stream: false,
     }),
   });
 
@@ -633,10 +718,8 @@ Continue the summary:`;
     throw new Error(`API request failed (${response.status}): ${errorText || response.statusText}`);
   }
 
-  const data = await response.json();
-  const continuation = data.choices?.[0]?.message?.content || "";
+  const continuation = await parseChatCompletionResponse(response);
 
-  // Combine partial with continuation
   return partialSummary + "\n\n" + continuation;
 }
 
@@ -727,6 +810,7 @@ Humanized version:`;
       ],
       temperature: 0.8,
       max_tokens: 4000,
+      stream: false,
     }),
   });
 
@@ -748,6 +832,5 @@ Humanized version:`;
     throw new Error(`API request failed (${response.status}): ${errorText || response.statusText}`);
   }
 
-  const data = await response.json();
-  return data.choices?.[0]?.message?.content || "";
+  return await parseChatCompletionResponse(response);
 }
