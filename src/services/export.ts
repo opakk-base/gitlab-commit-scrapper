@@ -14,6 +14,7 @@ import {
   convertInchesToTwip,
 } from "docx";
 import { saveAs } from "file-saver";
+import html2canvas from "html2canvas-pro";
 import { LLMSummary } from "./llm";
 import { SummaryHistoryItem } from "./summaryHistory";
 
@@ -849,4 +850,32 @@ export async function exportHistoryAsDOCX(
 
   const blob = await Packer.toBlob(doc);
   saveAs(blob, `${filename}.docx`);
+}
+
+// Export a DOM element as a high-quality PNG image
+export async function exportElementAsPNG(
+  element: HTMLElement,
+  filename = "commit-summary"
+): Promise<void> {
+  const canvas = await html2canvas(element, {
+    useCORS: true,
+    scale: 2,
+    backgroundColor: null,
+    logging: false,
+    scrollX: 0,
+    scrollY: -window.scrollY,
+    windowWidth: document.documentElement.offsetWidth,
+    windowHeight: document.documentElement.offsetHeight,
+  });
+
+  return new Promise<void>((resolve, reject) => {
+    canvas.toBlob((blob: Blob | null) => {
+      if (blob) {
+        saveAs(blob, `${filename}.png`);
+        resolve();
+      } else {
+        reject(new Error("Failed to generate PNG blob"));
+      }
+    }, "image/png");
+  });
 }

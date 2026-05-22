@@ -29,6 +29,7 @@ import {
   exportSummaryAsCSV,
   exportSummaryAsPDF,
   exportSummaryAsDOCX,
+  exportElementAsPNG,
 } from "../services/export";
 import {
   addSummaryHistory,
@@ -43,6 +44,7 @@ import {
   BackgroundTask,
 } from "../services/backgroundTask";
 import { useBackgroundTask } from "@/contexts/BackgroundTaskContext";
+import CodeScreenshot from "../components/CodeScreenshot";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -71,6 +73,113 @@ import {
   Play,
   AlertCircle,
 } from "lucide-react";
+
+const markdownComponents = {
+  h1: ({ children }: any) => (
+    <h1 className="text-2xl font-bold text-foreground mt-6 mb-4 first:mt-0">
+      {children}
+    </h1>
+  ),
+  h2: ({ children }: any) => (
+    <h2 className="text-xl font-bold text-foreground mt-5 mb-3 first:mt-0">
+      {children}
+    </h2>
+  ),
+  h3: ({ children }: any) => (
+    <h3 className="text-lg font-semibold text-foreground mt-4 mb-2 first:mt-0">
+      {children}
+    </h3>
+  ),
+  h4: ({ children }: any) => (
+    <h4 className="text-base font-semibold text-foreground mt-3 mb-2">
+      {children}
+    </h4>
+  ),
+  p: ({ children }: any) => (
+    <p className="text-muted-foreground leading-relaxed mb-3">
+      {children}
+    </p>
+  ),
+  ul: ({ children }: any) => (
+    <ul className="list-disc list-inside text-muted-foreground space-y-1 mb-3 ml-2">
+      {children}
+    </ul>
+  ),
+  ol: ({ children }: any) => (
+    <ol className="list-decimal list-inside text-muted-foreground space-y-1 mb-3 ml-2">
+      {children}
+    </ol>
+  ),
+  li: ({ children }: any) => (
+    <li className="text-muted-foreground">{children}</li>
+  ),
+  code: ({ className, children }: any) => {
+    const isInline = !className;
+    if (isInline) {
+      return (
+        <code className="bg-muted text-foreground px-1.5 py-0.5 rounded text-sm font-mono">
+          {children}
+        </code>
+      );
+    }
+    return (
+      <code className="block bg-muted text-foreground p-3 rounded text-sm font-mono overflow-x-auto">
+        {children}
+      </code>
+    );
+  },
+  pre: ({ children }: any) => (
+    <pre className="bg-muted rounded-lg p-3 overflow-x-auto mb-3">
+      {children}
+    </pre>
+  ),
+  blockquote: ({ children }: any) => (
+    <blockquote className="border-l-4 border-primary/50 pl-4 italic text-muted-foreground my-3">
+      {children}
+    </blockquote>
+  ),
+  strong: ({ children }: any) => (
+    <strong className="font-semibold text-foreground">
+      {children}
+    </strong>
+  ),
+  em: ({ children }: any) => (
+    <em className="italic text-muted-foreground">
+      {children}
+    </em>
+  ),
+  a: ({ href, children }: any) => (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-primary hover:underline"
+    >
+      {children}
+    </a>
+  ),
+  hr: () => <hr className="border-border my-4" />,
+  table: ({ children }: any) => (
+    <div className="overflow-x-auto mb-3">
+      <table className="min-w-full border-collapse border border-border">
+        {children}
+      </table>
+    </div>
+  ),
+  thead: ({ children }: any) => (
+    <thead className="bg-muted">{children}</thead>
+  ),
+  th: ({ children }: any) => (
+    <th className="border border-border px-3 py-2 text-left font-semibold text-foreground">
+      {children}
+    </th>
+  ),
+  td: ({ children }: any) => (
+    <td className="border border-border px-3 py-2 text-muted-foreground">
+      {children}
+    </td>
+  ),
+};
 
 export default function CommitSummary() {
   const navigate = useNavigate();
@@ -466,7 +575,7 @@ export default function CommitSummary() {
   };
 
   // Export handlers
-  const handleExport = async (format: "txt" | "csv" | "pdf" | "docx") => {
+  const handleExport = async (format: "txt" | "csv" | "pdf" | "docx" | "png") => {
     if (!existingSummary) return;
 
     setExporting(format);
@@ -487,6 +596,13 @@ export default function CommitSummary() {
           break;
         case "docx":
           await exportSummaryAsDOCX(existingSummary, filename);
+          break;
+        case "png":
+          if (summaryRef.current) {
+            await exportElementAsPNG(summaryRef.current, filename);
+          } else {
+            throw new Error("Summary container element not found");
+          }
           break;
       }
     } catch (err) {
@@ -527,6 +643,91 @@ export default function CommitSummary() {
   };
 
   const stats = getCommitStats();
+
+  // Helper to parse summary and render CodeScreenshot between Markdown blocks
+  const renderSummaryWithScreenshots = (summaryText: string) => {
+    if (!summaryText.includes("{SCREENSHOT CODE}")) {
+      return (
+        <ReactMarkdown components={markdownComponents}>
+          {summaryText}
+        </ReactMarkdown>
+      );
+    }
+
+    const parts = summaryText.split("{SCREENSHOT CODE}");
+    const renderedElements: React.ReactNode[] = [];
+
+    // Gather all modified file paths from scraped commits to match paths accurately
+    const allModifiedFiles = new Set<string>();
+    commits.forEach((c) => {
+      c.diffs?.forEach((d) => {
+        const path = d.new_path || d.old_path;
+        if (path) allModifiedFiles.add(path);
+      });
+    });
+
+    parts.forEach((partText, index) => {
+      // 1. Render the markdown text block
+      if (partText.trim()) {
+        renderedElements.push(
+          <div key={`markdown-${index}`} className="prose prose-sm max-w-none dark:prose-invert">
+            <ReactMarkdown components={markdownComponents}>
+              {partText}
+            </ReactMarkdown>
+          </div>
+        );
+      }
+
+      // 2. Render the CodeScreenshot component if it is not the last part
+      if (index < parts.length - 1) {
+        // Extract files mentioned in this partText block (since it's the preceding text for this tag)
+        const extractedFiles: string[] = [];
+        
+        // Match items inside backticks first (e.g. `public/backup/restorefile.php`)
+        const backtickRegex = /`([^`]+)`/g;
+        let match;
+        while ((match = backtickRegex.exec(partText)) !== null) {
+          extractedFiles.push(match[1].trim());
+        }
+
+        // Also search for general paths by file endings
+        const words = partText.split(/[\s,\*]+/);
+        words.forEach((word) => {
+          if (word.includes(".") || word.includes("/")) {
+            const cleaned = word.replace(/[^\w\.\-\/]/g, "").trim();
+            if (cleaned && !extractedFiles.includes(cleaned)) {
+              extractedFiles.push(cleaned);
+            }
+          }
+        });
+
+        // Filter to only match files that we actually scraped diffs for
+        const matchedFiles: string[] = [];
+        extractedFiles.forEach((file) => {
+          if (allModifiedFiles.has(file)) {
+            if (!matchedFiles.includes(file)) matchedFiles.push(file);
+          } else {
+            // Suffix matching (e.g., shorthand filename -> full path)
+            for (const modFile of allModifiedFiles) {
+              if (modFile.endsWith(file) || file.endsWith(modFile)) {
+                if (!matchedFiles.includes(modFile)) matchedFiles.push(modFile);
+              }
+            }
+          }
+        });
+
+        renderedElements.push(
+          <CodeScreenshot
+            key={`screenshot-${index}`}
+            files={matchedFiles}
+            commits={commits}
+          />
+        );
+      }
+    });
+
+    return <div className="space-y-4">{renderedElements}</div>;
+  };
 
   if (commits.length === 0) {
     return (
@@ -734,6 +935,12 @@ export default function CommitSummary() {
                           className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted"
                         >
                           📝 Export as Word (.docx)
+                        </button>
+                        <button
+                          onClick={() => handleExport("png")}
+                          className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted"
+                        >
+                          📸 Export as Image (.png)
                         </button>
                       </div>
                     </div>
@@ -967,118 +1174,7 @@ export default function CommitSummary() {
               </div>
             </div>
             <div className="p-4">
-              <div className="prose prose-sm max-w-none dark:prose-invert">
-                <ReactMarkdown
-                  components={{
-                    h1: ({ children }) => (
-                      <h1 className="text-2xl font-bold text-foreground mt-6 mb-4 first:mt-0">
-                        {children}
-                      </h1>
-                    ),
-                    h2: ({ children }) => (
-                      <h2 className="text-xl font-bold text-foreground mt-5 mb-3 first:mt-0">
-                        {children}
-                      </h2>
-                    ),
-                    h3: ({ children }) => (
-                      <h3 className="text-lg font-semibold text-foreground mt-4 mb-2 first:mt-0">
-                        {children}
-                      </h3>
-                    ),
-                    h4: ({ children }) => (
-                      <h4 className="text-base font-semibold text-foreground mt-3 mb-2">
-                        {children}
-                      </h4>
-                    ),
-                    p: ({ children }) => (
-                      <p className="text-muted-foreground leading-relaxed mb-3">
-                        {children}
-                      </p>
-                    ),
-                    ul: ({ children }) => (
-                      <ul className="list-disc list-inside text-muted-foreground space-y-1 mb-3 ml-2">
-                        {children}
-                      </ul>
-                    ),
-                    ol: ({ children }) => (
-                      <ol className="list-decimal list-inside text-muted-foreground space-y-1 mb-3 ml-2">
-                        {children}
-                      </ol>
-                    ),
-                    li: ({ children }) => (
-                      <li className="text-muted-foreground">{children}</li>
-                    ),
-                    code: ({ className, children }) => {
-                      const isInline = !className;
-                      if (isInline) {
-                        return (
-                          <code className="bg-muted text-foreground px-1.5 py-0.5 rounded text-sm font-mono">
-                            {children}
-                          </code>
-                        );
-                      }
-                      return (
-                        <code className="block bg-muted text-foreground p-3 rounded text-sm font-mono overflow-x-auto">
-                          {children}
-                        </code>
-                      );
-                    },
-                    pre: ({ children }) => (
-                      <pre className="bg-muted rounded-lg p-3 overflow-x-auto mb-3">
-                        {children}
-                      </pre>
-                    ),
-                    blockquote: ({ children }) => (
-                      <blockquote className="border-l-4 border-primary/50 pl-4 italic text-muted-foreground my-3">
-                        {children}
-                      </blockquote>
-                    ),
-                    strong: ({ children }) => (
-                      <strong className="font-semibold text-foreground">
-                        {children}
-                      </strong>
-                    ),
-                    em: ({ children }) => (
-                      <em className="italic text-muted-foreground">
-                        {children}
-                      </em>
-                    ),
-                    a: ({ href, children }) => (
-                      <a
-                        href={href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary hover:underline"
-                      >
-                        {children}
-                      </a>
-                    ),
-                    hr: () => <hr className="border-border my-4" />,
-                    table: ({ children }) => (
-                      <div className="overflow-x-auto mb-3">
-                        <table className="min-w-full border-collapse border border-border">
-                          {children}
-                        </table>
-                      </div>
-                    ),
-                    thead: ({ children }) => (
-                      <thead className="bg-muted">{children}</thead>
-                    ),
-                    th: ({ children }) => (
-                      <th className="border border-border px-3 py-2 text-left font-semibold text-foreground">
-                        {children}
-                      </th>
-                    ),
-                    td: ({ children }) => (
-                      <td className="border border-border px-3 py-2 text-muted-foreground">
-                        {children}
-                      </td>
-                    ),
-                  }}
-                >
-                  {existingSummary.summary}
-                </ReactMarkdown>
-              </div>
+              {renderSummaryWithScreenshots(existingSummary.summary)}
             </div>
           </div>
 

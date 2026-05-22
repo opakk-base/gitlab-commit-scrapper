@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   getSummaryHistory,
   deleteSummaryHistory,
@@ -11,6 +11,7 @@ import {
   exportHistoryAsCSV,
   exportHistoryAsPDF,
   exportHistoryAsDOCX,
+  exportElementAsPNG,
 } from "../services/export";
 import { getLLMConfig, humanizeText, LLMConfig } from "../services/llm";
 import { toast } from "sonner";
@@ -58,6 +59,8 @@ export default function Dashboard() {
   const [refining, setRefining] = useState(false);
   const [showRefineDialog, setShowRefineDialog] = useState(false);
   const [llmConfig, setLlmConfig] = useState<LLMConfig | null>(null);
+
+  const summaryCardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadHistory();
@@ -158,7 +161,7 @@ export default function Dashboard() {
 
   const handleExport = async (
     item: SummaryHistoryItem,
-    format: "txt" | "csv" | "pdf" | "docx",
+    format: "txt" | "csv" | "pdf" | "docx" | "png",
   ) => {
     setExporting(format);
     setShowExportMenu(null);
@@ -179,9 +182,17 @@ export default function Dashboard() {
         case "docx":
           await exportHistoryAsDOCX(item, filename);
           break;
+        case "png":
+          if (summaryCardRef.current) {
+            await exportElementAsPNG(summaryCardRef.current, filename);
+          } else {
+            toast.error("Summary element not found");
+          }
+          break;
       }
     } catch (err) {
       console.error("Export failed:", err);
+      toast.error(`Failed to export as ${format.toUpperCase()}`);
     } finally {
       setExporting(null);
     }
@@ -563,7 +574,7 @@ export default function Dashboard() {
                 )}
 
                 {/* Summary content */}
-                <div className="bg-card rounded-lg border border-border">
+                <div ref={summaryCardRef} className="bg-card rounded-lg border border-border">
                   <div className="p-4 border-b border-border">
                     <h4 className="font-medium text-foreground">Summary</h4>
                   </div>
@@ -684,6 +695,17 @@ export default function Dashboard() {
               >
                 <Download className="h-4 w-4 mr-2" />
                 Word
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  selectedItem && handleExport(selectedItem, "png")
+                }
+                disabled={exporting === "png"}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Image
               </Button>
             </div>
             <Button

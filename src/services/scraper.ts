@@ -35,6 +35,7 @@ const defaultCustomPrompt: CustomPrompt = {
 - \`code\` for file names, commit IDs, and technical terms
 - Tables when comparing or listing data
 - Code blocks with \`\`\` for multi-line code or logs
+- **Code Screenshot Tag**: Always insert the exact string \`{SCREENSHOT CODE}\` on a new line immediately following any file references or list of files modified (e.g. 'Referensi File: file1.php, file2.php') so that the application can render high-quality code snapshot mockups for those files.
 
 Focus on:
 1. Technical changes and their significance

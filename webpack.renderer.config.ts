@@ -1,12 +1,12 @@
 import type { Configuration } from 'webpack';
 import path from 'path';
 
-import { rules } from './webpack.rules';
+import { rendererRules } from './webpack.rules';
 import { plugins } from './webpack.plugins';
 
 export const rendererConfig: Configuration = {
   module: {
-    rules,
+    rules: rendererRules,
   },
   plugins,
   resolve: {
